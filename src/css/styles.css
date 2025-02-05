@@ -1,0 +1,104 @@
+body {
+  font-family: 'Encode Sans', sans-serif;
+}
+
+h3 {
+  font-size: 16pt;
+}
+
+.card-deck img {
+  width: 100px;
+}
+
+.card {
+  max-width: 20rem;
+}
+
+.card:hover {
+  background-color: #eaeaea;
+}
+
+.card-body h4, .card-body p {
+  color: black;
+}
+
+.card a:hover {
+  text-decoration: none;
+}
+
+.navBubble:hover, .triangle-left:hover, .triangle-right:hover {
+  cursor: pointer;
+}
+
+.triangle-left, .triangle-right {
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+}
+
+.triangle-left {
+  border-right: 20px solid #555;
+}
+
+.triangle-right {
+  border-left: 20px solid #555;
+}
+
+.navLink {
+  width: 50px;
+  height: 50px;
+}
+
+nav {
+  position: fixed;
+  width: 6rem;
+  background-color: #5C3A99; /* Slightly lighter purple */
+}
+
+nav a {
+  color: black;
+}
+
+nav a:hover {
+  background-color: #ededed;
+  text-decoration: none;
+}
+
+nav p {
+  font-size: 11pt;
+  color: black;
+}
+
+form input {
+  border: none;
+  font-size: 14pt;
+}
+
+#test-name, form label {
+  font-size: 16pt;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 150px;
+    padding: 15px;
+  }
+  .content {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 576px) {
+  .sidebar {
+    width: 100px;
+    padding: 10px;
+  }
+  .content {
+    padding: 10px;
+  }
+  .navLink {
+    width: 40px;
+    height: 40px;
+  }
+}
