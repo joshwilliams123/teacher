@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "./css/styles.css";
+import { db, addDoc, collection } from './firebase'; 
 
 function CreateTest() {
   const [successMessage, setSuccessMessage] = useState(false);
@@ -27,10 +29,17 @@ function CreateTest() {
     }]);
   };
 
-  const handleSaveTest = (e) => {
+  const handleSaveTest = async (e) => {
     e.preventDefault();
-    // Add your save logic here
-    setSuccessMessage(true);
+    try {
+      await addDoc(collection(db, "tests"), {
+        testName: e.target["test-name"].value, 
+        questions: questions
+      });
+      setSuccessMessage(true);
+    } catch (error) {
+      console.error("Error adding document: ", error);
+    }
   };
 
   const handleInputChange = (questionIndex, field, value) => {
@@ -43,6 +52,13 @@ function CreateTest() {
     const newQuestions = [...questions];
     newQuestions[questionIndex].choices[choiceIndex] = value;
     setQuestions(newQuestions);
+  };
+
+  // Function to style the correct answer with a green background
+  const getChoiceStyle = (questionIndex, choiceIndex) => {
+    return questions[questionIndex].correctAnswer === String.fromCharCode(97 + choiceIndex)
+      ? { backgroundColor: "lightgreen" }
+      : {};
   };
 
   return (
@@ -94,6 +110,7 @@ function CreateTest() {
                           placeholder={`Answer Choice ${choiceIndex + 1}`}
                           value={choice}
                           onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, e.target.value)}
+                          style={getChoiceStyle(questionIndex, choiceIndex)} // Apply green style to correct answer
                         />
                       </li>
                     ))}
@@ -144,7 +161,7 @@ function CreateTest() {
         {successMessage && (
           <div className="alert alert-success text-center">
             <p>
-              Your test was saved successfully! To publish your test, go to the View Tests page
+              Your test was saved successfully! To publish your test, go to the View Tests page.
             </p>
           </div>
         )}

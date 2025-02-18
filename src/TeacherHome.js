@@ -12,11 +12,6 @@ function TeacherHome() {
       </header>
 
       <main className="text-center">
-        <h2>Current Published Test</h2>
-        <h3>Example Test</h3>
-        <progress value="50" max="100">50%</progress>
-        <p>18/36 finished</p>
-
         <div className="row justify-content-center mt-4">
           <div className="col-md-4">
             <div className="card">
