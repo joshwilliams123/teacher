@@ -7,6 +7,9 @@ import MonitorProgress from "./MonitorProgress";
 import TestViewer from "./TestViewer"
 import EditTest from "./EditTest";
 import TeacherChoice from "./TeacherChoice";
+import CreateItem from "./CreateItem";
+import ViewItems from "./ViewItems";
+import EditItem from "./EditItem";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 function App() {
@@ -17,9 +20,12 @@ function App() {
         <Routes>
           <Route path="/" element={<TeacherHome />} />
           <Route path="/teacher-choice" element={<TeacherChoice />} />
+          <Route path="/create-item" element={<CreateItem />} />
           <Route path="/create-test" element={<CreateTest />} />
+          <Route path="/view-items" element={<ViewItems />} />
           <Route path="/monitor-progress" element={<MonitorProgress />} />
           <Route path="/test-viewer" element={<TestViewer />} />
+          <Route path="/edit-item/:itemId" element={<EditItem />} />
           <Route path="/edit-test/:testId" element={<EditTest />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

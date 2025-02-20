@@ -63,18 +63,18 @@ function EditTest() {
   
     const handleAddQuestion = () => {
       const newQuestion = {
-        id: questions.length + 1,  // Auto-increment based on existing questions
+        id: questions.length + 1,  
         title: "",
         text: "Enter question text here.",
-        choices: ["", ""], // Start with two empty choices
-        correctAnswer: "a",  // Default correct answer
+        choices: ["", ""], 
+        correctAnswer: "a",  
       };
       setQuestions([...questions, newQuestion]);
     };
   
     const handleAddOption = (questionIndex) => {
       const newQuestions = [...questions];
-      newQuestions[questionIndex].choices.push(""); // Add a new empty choice
+      newQuestions[questionIndex].choices.push(""); 
       setQuestions(newQuestions);
     };
   
@@ -125,7 +125,7 @@ function EditTest() {
                             placeholder={`Answer Choice ${choiceIndex + 1}`}
                             value={choice}
                             onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, e.target.value)}
-                            style={getChoiceStyle(questionIndex, choiceIndex)} // Apply green style to correct answer
+                            style={getChoiceStyle(questionIndex, choiceIndex)} 
                           />
                         </li>
                       ))}

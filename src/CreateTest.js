@@ -1,40 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
-import { db, addDoc, collection } from './firebase'; 
+import { db, addDoc, collection, getDocs } from "./firebase";
 
 function CreateTest() {
   const [successMessage, setSuccessMessage] = useState(false);
-  const [questions, setQuestions] = useState([{
-    id: 1,
-    title: "",
-    text: "Enter question text here.",
-    choices: ["", ""],
-    correctAnswer: "a"
-  }]);
+  const [testName, setTestName] = useState("");
+  const [items, setItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState([]);
 
-  const handleAddOption = (questionIndex) => {
-    const newQuestions = [...questions];
-    newQuestions[questionIndex].choices.push("");
-    setQuestions(newQuestions);
-  };
-
-  const handleAddQuestion = () => {
-    setQuestions([...questions, {
-      id: questions.length + 1,
-      title: "",
-      text: "Enter question text here.",
-      choices: ["", ""],
-      correctAnswer: "a"
-    }]);
-  };
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "items"));
+        const itemList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setItems(itemList);
+      } catch (error) {
+        console.error("Error fetching items: ", error);
+      }
+    };
+    fetchItems();
+  }, []);
 
   const handleSaveTest = async (e) => {
     e.preventDefault();
     try {
       await addDoc(collection(db, "tests"), {
-        testName: e.target["test-name"].value, 
-        questions: questions
+        testName: testName,
+        questions: selectedItems
       });
       setSuccessMessage(true);
     } catch (error) {
@@ -42,23 +35,14 @@ function CreateTest() {
     }
   };
 
-  const handleInputChange = (questionIndex, field, value) => {
-    const newQuestions = [...questions];
-    newQuestions[questionIndex][field] = value;
-    setQuestions(newQuestions);
+  const handleItemSelection = (item) => {
+    setSelectedItems(prevSelected =>
+      prevSelected.find(q => q.id === item.id) ? prevSelected : [...prevSelected, item]
+    );
   };
 
-  const handleChoiceChange = (questionIndex, choiceIndex, value) => {
-    const newQuestions = [...questions];
-    newQuestions[questionIndex].choices[choiceIndex] = value;
-    setQuestions(newQuestions);
-  };
-
-  // Function to style the correct answer with a green background
-  const getChoiceStyle = (questionIndex, choiceIndex) => {
-    return questions[questionIndex].correctAnswer === String.fromCharCode(97 + choiceIndex)
-      ? { backgroundColor: "lightgreen" }
-      : {};
+  const handleRemoveItem = (id) => {
+    setSelectedItems(prevSelected => prevSelected.filter(q => q.id !== id));
   };
 
   return (
@@ -70,7 +54,6 @@ function CreateTest() {
           </div>
         </div>
       </header>
-
       <main className="container">
         <form onSubmit={handleSaveTest}>
           <div className="form-group mb-4">
@@ -79,90 +62,55 @@ function CreateTest() {
               id="test-name"
               className="form-control"
               placeholder="Ex: The Normal Curve"
+              value={testName}
+              onChange={(e) => setTestName(e.target.value)}
             />
           </div>
-
-          {questions.map((question, questionIndex) => (
-            <div key={question.id} className="form-group mb-4">
-              <div className="card">
-                <div className="card-body">
-                  <h3 className="card-title">{question.id}.</h3>
-                  
-                  <input
-                    className="form-control mb-3"
-                    placeholder="Question Title (optional)"
-                    value={question.title}
-                    onChange={(e) => handleInputChange(questionIndex, 'title', e.target.value)}
-                  />
-
-                  <textarea
-                    className="form-control mb-3"
-                    rows="5"
-                    value={question.text}
-                    onChange={(e) => handleInputChange(questionIndex, 'text', e.target.value)}
-                  />
-
-                  <ol type="a" className="list-group">
-                    {question.choices.map((choice, choiceIndex) => (
-                      <li key={choiceIndex} className="list-group-item border-0">
-                        <input
-                          className="form-control mb-2"
-                          placeholder={`Answer Choice ${choiceIndex + 1}`}
-                          value={choice}
-                          onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, e.target.value)}
-                          style={getChoiceStyle(questionIndex, choiceIndex)} // Apply green style to correct answer
-                        />
-                      </li>
-                    ))}
-                  </ol>
-
+          <div className="mb-4">
+            <h5>Available Items</h5>
+            <ul className="list-group">
+              {items.map((item) => (
+                <li key={item.id} className="list-group-item">
+                  <strong>{item.title}</strong>
+                  <p>{item.text}</p>
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm mt-3"
-                    onClick={() => handleAddOption(questionIndex)}
+                    className="btn btn-primary btn-sm"
+                    onClick={() => handleItemSelection(item)}
                   >
-                    Add Option
+                    Add to Test
                   </button>
-
-                  <h6 className="mt-3">Correct Answer:</h6>
-                  <select
-                    className="form-select"
-                    value={question.correctAnswer}
-                    onChange={(e) => handleInputChange(questionIndex, 'correctAnswer', e.target.value)}
-                  >
-                    {question.choices.map((_, index) => (
-                      <option key={index} value={String.fromCharCode(97 + index)}>
-                        {String.fromCharCode(97 + index)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          ))}
-
+                </li>
+              ))}
+            </ul>
+          </div>
           <div className="mb-4">
-            <button
-              type="button"
-              className="btn btn-primary btn-lg me-2"
-              onClick={handleAddQuestion}
-            >
-              Add Question
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary btn-lg"
-            >
+            <h5>Selected Items</h5>
+            <ul className="list-group">
+              {selectedItems.map((item) => (
+                <li key={item.id} className="list-group-item">
+                  <strong>{item.title}</strong>
+                  <p>{item.text}</p>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleRemoveItem(item.id)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mb-4">
+            <button type="submit" className="btn btn-primary btn-lg">
               Save Test
             </button>
           </div>
         </form>
-
         {successMessage && (
           <div className="alert alert-success text-center">
-            <p>
-              Your test was saved successfully! To publish your test, go to the View Tests page.
-            </p>
+            <p>Your test was saved successfully! To publish your test, go to the View Tests page.</p>
           </div>
         )}
       </main>
