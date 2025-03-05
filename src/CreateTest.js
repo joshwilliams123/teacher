@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
-import { db, addDoc, collection, getDocs } from "./firebase";
+import { db, addDoc, collection, getDocs, query, where } from "./firebase";
+import { getAuth } from "firebase/auth"; 
 
 function CreateTest() {
   const [successMessage, setSuccessMessage] = useState(false);
@@ -9,10 +11,20 @@ function CreateTest() {
   const [items, setItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
 
+  const auth = getAuth();  
+  const navigate = useNavigate();
+
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "items"));
+        const currentUser = auth.currentUser; 
+        if (!currentUser) {
+          console.error("No user is logged in");
+          return;
+        }
+
+        const q = query(collection(db, "items"), where("userId", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
         const itemList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setItems(itemList);
       } catch (error) {
@@ -20,16 +32,25 @@ function CreateTest() {
       }
     };
     fetchItems();
-  }, []);
+  }, [auth]);
 
   const handleSaveTest = async (e) => {
     e.preventDefault();
+    const currentUser = auth.currentUser;  
+    
+    if (!currentUser) {
+      console.error("No user is logged in");
+      return; 
+    }
+
     try {
       await addDoc(collection(db, "tests"), {
         testName: testName,
-        questions: selectedItems
+        questions: selectedItems,
+        userId: currentUser.uid,  
       });
       setSuccessMessage(true);
+      navigate("/test-viewer");
     } catch (error) {
       console.error("Error adding document: ", error);
     }
@@ -50,7 +71,7 @@ function CreateTest() {
       <header>
         <div className="jumbotron jumbotron-fluid bg-light">
           <div className="container text-center">
-            <h1>Create, Edit, and Publish Tests</h1>
+            <h1>Create Tests</h1>
           </div>
         </div>
       </header>

@@ -6,6 +6,7 @@ import "katex/dist/katex.min.css";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from './firebase';
 import { useParams } from "react-router-dom";
+import { getAuth } from "firebase/auth";  
 
 function EditItem() {
     const { itemId } = useParams();
@@ -17,6 +18,7 @@ function EditItem() {
         correctAnswer: "a",
         imageUrl: ""
     });
+    const auth = getAuth();  
 
     useEffect(() => {
         const fetchItem = async () => {
@@ -35,9 +37,19 @@ function EditItem() {
 
     const handleSaveItem = async (e) => {
         e.preventDefault();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            console.error("No user is logged in");
+            return;
+        }
+
         try {
             const itemRef = doc(db, "items", itemId);
-            await updateDoc(itemRef, item);
+            await updateDoc(itemRef, {
+                ...item,
+                userId: currentUser.uid,  
+            });
             setSuccessMessage(true);
             setTimeout(() => setSuccessMessage(false), 3000);
         } catch (error) {
@@ -63,6 +75,14 @@ function EditItem() {
 
     const handleAddOption = () => {
         setItem((prevItem) => ({ ...prevItem, choices: [...prevItem.choices, ""] }));
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const imageUrl = URL.createObjectURL(file);  
+            setItem((prevItem) => ({ ...prevItem, imageUrl }));
+        }
     };
 
     return (
@@ -94,6 +114,18 @@ function EditItem() {
                         <div className="mt-2 p-2 border">
                             <BlockMath>{item.text}</BlockMath>
                         </div>
+                    </div>
+
+                    <div className="form-group mb-4">
+                        <label>Image Upload</label>
+                        <input
+                            type="file"
+                            className="form-control"
+                            onChange={handleImageChange}
+                        />
+                        {item.imageUrl && (
+                            <img src={item.imageUrl} alt="Uploaded" className="img-fluid mt-3" />
+                        )}
                     </div>
 
                     <ol type="a" className="list-group">

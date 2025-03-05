@@ -2,27 +2,39 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
+import { getAuth } from "firebase/auth";
 
 function TestViewer() {
   const [tests, setTests] = useState([]);
   const [successMessage, setSuccessMessage] = useState("");
   const navigate = useNavigate();
+  const auth = getAuth(); 
 
   useEffect(() => {
     const fetchTests = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "tests"));
-        const testData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), published: false }));
-        setTests(testData);
+        const currentUser = auth.currentUser;
+
+        if (currentUser) {
+          const userId = currentUser.uid; 
+
+          const q = query(collection(db, "tests"), where("userId", "==", userId));
+          const querySnapshot = await getDocs(q);
+          
+          const testData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), published: false }));
+          setTests(testData);
+        } else {
+          console.log("No user is authenticated");
+        }
       } catch (error) {
         console.error("Error fetching tests: ", error);
       }
     };
-    
+
     fetchTests();
-  }, []);
+  }, [auth]); 
 
   const handlePublish = async (testId) => {
     try {
@@ -46,7 +58,7 @@ function TestViewer() {
       <header>
         <div className="jumbotron jumbotron-fluid bg-light">
           <div className="container text-center">
-            <h1>Edit and Publish Tests</h1>
+            <h1>View, Edit, & Publish Tests</h1>
           </div>
         </div>
       </header>

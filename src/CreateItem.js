@@ -1,20 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { db, addDoc, collection, storage, ref, uploadBytes, getDownloadURL } from "./firebase";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { db, addDoc, collection, storage, ref, uploadBytes, getDownloadURL } from "./firebase";
 
 function CreateItem() {
     const [item, setItem] = useState({
         title: "",
-        text: "Enter question text here.",
+        text: "",
         choices: ["", ""],
         correctAnswer: "a",
         imageUrl: "",
         choiceImages: ["", ""]
     });
     const [successMessage, setSuccessMessage] = useState(false);
+    const [user, setUser] = useState(null);
+    
+    const auth = getAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, [auth]);
 
     const handleInputChange = (field, value) => {
         setItem(prevItem => ({ ...prevItem, [field]: value }));
@@ -62,9 +75,19 @@ function CreateItem() {
 
     const handleSaveItem = async (e) => {
         e.preventDefault();
+        if (!user) {
+            alert("You must be logged in to save items.");
+            return;
+        }
+        
         try {
-            await addDoc(collection(db, "items"), item);
+            await addDoc(collection(db, "items"), {
+                ...item,
+                userId: user.uid, 
+                createdAt: new Date()
+            });
             setSuccessMessage(true);
+            navigate("/view-items");
         } catch (error) {
             console.error("Error adding document: ", error);
         }
@@ -88,7 +111,7 @@ function CreateItem() {
             <main className="container">
                 <form onSubmit={handleSaveItem}>
                     <div className="form-group mb-4">
-                        <label>Question Title (optional)</label>
+                        <label>Question Title</label>
                         <input
                             className="form-control"
                             value={item.title}
