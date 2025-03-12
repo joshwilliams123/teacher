@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { getAuth, signOut } from "firebase/auth";
 import Sidebar from "./Sidebar";
 import AuthRoute from "./AuthRoute";
 import TeacherHome from "./TeacherHome";
@@ -16,6 +17,25 @@ import Login from "./Login";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 function App() {
+  const auth = getAuth();
+
+  useEffect(() => {
+    const handleTabClose = async () => {
+      try {
+        await signOut(auth);
+        console.log("User logged out on tab close.");
+      } catch (error) {
+        console.error("Error logging out:", error);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleTabClose);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleTabClose);
+    };
+  }, []);
+
   return (
     <div className="d-flex">
       <Sidebar />

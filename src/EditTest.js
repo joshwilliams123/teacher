@@ -190,9 +190,9 @@ function EditTest() {
                                         {question.imageUrl && <img src={question.imageUrl} alt="Question" className="mt-2" style={{ width: "100%", maxHeight: "300px", objectFit: "contain" }} />}
                                     </div>
 
-                                    <div className="mt-2 p-2 border">
-                                        <BlockMath>{question.text}</BlockMath>
-                                    </div>
+                                    <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
+                                                                <BlockMath>{question.text}</BlockMath>
+                                                            </div>
 
                                     <ol type="a" className="list-group">
                                         {question.choices.map((choice, choiceIndex) => (
@@ -204,9 +204,14 @@ function EditTest() {
                                                     onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, e.target.value)}
                                                     style={getChoiceStyle(questionIndex, choiceIndex)}
                                                 />
-                                                <div className="mt-2 p-2 border">
-                                                    <InlineMath>{choice}</InlineMath>
-                                                </div>
+                                                <div className="mt-2 p-2 border" style={{
+                                                                                    overflowX: "auto",
+                                                                                    wordWrap: "break-word",
+                                                                                    maxWidth: "100%",
+                                                                                    whiteSpace: "normal"
+                                                                                }}>
+                                                                                    <InlineMath>{choice}</InlineMath>
+                                                                                </div>
                                             </li>
                                         ))}
                                     </ol>

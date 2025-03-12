@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { db, addDoc, collection, storage, ref, uploadBytes, getDownloadURL } from "./firebase";
+import { db, addDoc, collection } from "./firebase";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
+import Compressor from 'compressorjs';
 
 function CreateItem() {
     const [item, setItem] = useState({
@@ -18,7 +19,7 @@ function CreateItem() {
     });
     const [successMessage, setSuccessMessage] = useState(false);
     const [user, setUser] = useState(null);
-    
+
     const auth = getAuth();
     const navigate = useNavigate();
 
@@ -39,34 +40,57 @@ function CreateItem() {
         setItem(prevItem => ({ ...prevItem, choices: newChoices }));
     };
 
-    const handleChoiceImageUpload = async (event, index) => {
+    const handleImageUpload = (event) => {
         const file = event.target.files[0];
         if (!file) return;
-
-        const storageRef = ref(storage, `choice-images/${file.name}`);
-        try {
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
-            const newChoiceImages = [...item.choiceImages];
-            newChoiceImages[index] = downloadURL;
-            setItem(prevItem => ({ ...prevItem, choiceImages: newChoiceImages }));
-        } catch (error) {
-            console.error("Image upload failed: ", error);
-        }
+    
+        new Compressor(file, {
+            quality: 0.6, 
+            maxWidth: 800, 
+            maxHeight: 600,
+            success(result) {
+                const reader = new FileReader();
+                reader.readAsDataURL(result);
+    
+                reader.onload = () => {
+                    const base64String = reader.result;
+                    setItem(prevItem => ({ ...prevItem, imageUrl: base64String }));
+                    console.log("Image compressed and converted to Base64:", base64String.substring(0, 100));
+                };
+            },
+            error(err) {
+                console.error("Error compressing image:", err);
+            }
+        });
     };
-
-    const handleImageUpload = async (event, field) => {
+    
+    const handleChoiceImageUpload = (event, index) => {
         const file = event.target.files[0];
         if (!file) return;
-
-        const storageRef = ref(storage, `item-images/${file.name}`);
-        try {
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
-            handleInputChange(field, downloadURL);
-        } catch (error) {
-            console.error("Image upload failed: ", error);
-        }
+    
+        new Compressor(file, {
+            quality: 0.6,
+            maxWidth: 800,
+            maxHeight: 600,
+            success(result) {
+                const reader = new FileReader();
+                reader.readAsDataURL(result);
+    
+                reader.onload = () => {
+                    const base64String = reader.result;
+                    setItem((prevItem) => {
+                        const updatedChoiceImages = [...prevItem.choiceImages];
+                        updatedChoiceImages[index] = base64String;
+    
+                        return { ...prevItem, choiceImages: updatedChoiceImages };
+                    });
+                    console.log(`Choice ${index + 1} image compressed and converted to Base64:`, base64String.substring(0, 100));
+                };
+            },
+            error(err) {
+                console.error("Error compressing choice image:", err);
+            }
+        });
     };
 
     const handleAddOption = () => {
@@ -79,11 +103,11 @@ function CreateItem() {
             alert("You must be logged in to save items.");
             return;
         }
-        
+
         try {
             await addDoc(collection(db, "items"), {
                 ...item,
-                userId: user.uid, 
+                userId: user.uid,
                 createdAt: new Date()
             });
             setSuccessMessage(true);
@@ -126,7 +150,7 @@ function CreateItem() {
                             value={item.text}
                             onChange={(e) => handleInputChange("text", e.target.value)}
                         />
-                        <div className="mt-2 p-2 border">
+                        <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
                             <BlockMath>{item.text}</BlockMath>
                         </div>
                     </div>
@@ -153,23 +177,37 @@ function CreateItem() {
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-                                <div className="mt-2 p-2 border">
+
+                                <div className="mt-2 p-2 border" style={{
+                                    overflowX: "auto",
+                                    wordWrap: "break-word",
+                                    maxWidth: "100%",
+                                    whiteSpace: "normal"
+                                }}>
                                     <InlineMath>{choice}</InlineMath>
                                 </div>
+
                                 <input
                                     type="file"
                                     className="form-control mt-2"
                                     accept="image/*"
                                     onChange={(e) => handleChoiceImageUpload(e, index)}
                                 />
+
                                 {item.choiceImages[index] && (
                                     <div className="mt-2">
-                                        <img src={item.choiceImages[index]} alt={`Choice ${index + 1}`} className="img-fluid" style={{ maxHeight: "100px" }} />
+                                        <img
+                                            src={item.choiceImages[index]}
+                                            alt={`Choice ${index + 1}`}
+                                            className="img-fluid rounded"
+                                            style={{ maxHeight: "100px", objectFit: "contain" }}
+                                        />
                                     </div>
                                 )}
                             </li>
                         ))}
                     </ol>
+
 
                     <button
                         type="button"

@@ -5,6 +5,8 @@ import "./css/styles.css";
 import { db } from "./firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { getAuth } from "firebase/auth"; 
+import { InlineMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
 
 function ViewItems() {
   const [items, setItems] = useState([]);
@@ -48,11 +50,49 @@ function ViewItems() {
               <div className="card">
                 <div className="card-body">
                   <h5 className="card-title">{item.title}</h5>
-                  <p className="card-text">{item.text}</p>
+                  <p className="card-text"><InlineMath math={item.text} /></p>
+
                   {item.imageUrl && (
                     <img src={item.imageUrl} alt="Item" className="img-fluid mb-2" style={{ maxHeight: "150px" }} />
                   )}
-                  <div>
+
+                  {item.choices && item.choices.length > 0 && (
+                    <div
+                      className="border rounded p-2 mt-3"
+                      style={{
+                        maxHeight: "170px", 
+                        overflowY: "auto",
+                        backgroundColor: "#f8f9fa" 
+                      }}
+                    >
+                      <ol type="a" className="list-group list-group-flush">
+                        {item.choices.map((choice, index) => (
+                          <li
+                            key={index}
+                            className={`list-group-item ${item.correctAnswer === String.fromCharCode(97 + index) ? "bg-success text-white" : ""}`}
+                            style={{
+                              border: "none", 
+                              padding: "8px"
+                            }}
+                          >
+                            <InlineMath math={choice} />
+                            {item.choiceImages && item.choiceImages[index] && (
+                              <div className="mt-2">
+                                <img
+                                  src={item.choiceImages[index]}
+                                  alt={`Choice ${index + 1}`}
+                                  className="img-fluid rounded"
+                                  style={{ maxHeight: "80px", objectFit: "contain" }}
+                                />
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  <div className="mt-3">
                     <Link to={`/edit-item/${item.id}`} className="btn btn-primary btn-sm me-2">
                       Edit Item
                     </Link>

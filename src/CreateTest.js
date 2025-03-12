@@ -4,6 +4,9 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { db, addDoc, collection, getDocs, query, where } from "./firebase";
 import { getAuth } from "firebase/auth"; 
+import { InlineMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
+
 
 function CreateTest() {
   const [successMessage, setSuccessMessage] = useState(false);
@@ -87,16 +90,50 @@ function CreateTest() {
               onChange={(e) => setTestName(e.target.value)}
             />
           </div>
+
           <div className="mb-4">
             <h5>Available Items</h5>
             <ul className="list-group">
               {items.map((item) => (
                 <li key={item.id} className="list-group-item">
                   <strong>{item.title}</strong>
-                  <p>{item.text}</p>
+                  <p><InlineMath math={item.text} /></p>
+
+                  {item.choices && item.choices.length > 0 && (
+                    <div 
+                      className="border rounded mt-2"
+                      style={{
+                        maxHeight: "150px",
+                        overflowY: "auto",
+                        backgroundColor: "#f1f1f1"
+                      }}
+                    >
+                      <ol type="a" className="list-group list-group-flush">
+                        {item.choices.map((choice, index) => (
+                          <li
+                            key={index}
+                            className={`list-group-item ${item.correctAnswer === String.fromCharCode(97 + index) ? "bg-success text-white" : ""}`}
+                          >
+                             <InlineMath math={choice} />
+                            {item.choiceImages && item.choiceImages[index] && (
+                              <div className="mt-2">
+                                <img
+                                  src={item.choiceImages[index]}
+                                  alt={`Choice ${index + 1}`}
+                                  className="img-fluid rounded"
+                                  style={{ maxHeight: "60px", objectFit: "contain" }}
+                                />
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
+                    className="btn btn-primary btn-sm mt-2"
                     onClick={() => handleItemSelection(item)}
                   >
                     Add to Test
@@ -105,6 +142,7 @@ function CreateTest() {
               ))}
             </ul>
           </div>
+
           <div className="mb-4">
             <h5>Selected Items</h5>
             <ul className="list-group">
@@ -123,12 +161,14 @@ function CreateTest() {
               ))}
             </ul>
           </div>
+
           <div className="mb-4">
             <button type="submit" className="btn btn-primary btn-lg">
               Save Test
             </button>
           </div>
         </form>
+
         {successMessage && (
           <div className="alert alert-success text-center">
             <p>Your test was saved successfully! To publish your test, go to the View Tests page.</p>

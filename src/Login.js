@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "./firebase";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -23,13 +23,34 @@ const Login = () => {
       setSuccessMessage("You have successfully logged in! You will be redirected to the teacher home page.");
       setEmail("");
       setPassword("");
-      setTimeout(() => navigate("/teacher-home"), 2500);
+      setTimeout(() => {
+        setSuccessMessage("");
+        navigate("/teacher-home");
+      }, 2500);
     } catch (err) {
       if (err.code === "auth/invalid-credential") {
         setError("Invalid email or password.");
       } else {
         setError(err.message);
       }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError("");
+    setSuccessMessage("");
+
+    if (!email) {
+      setError("Please enter your email to reset your password.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccessMessage("A password reset email has been sent to your inbox.");
+      setTimeout(() => setSuccessMessage(""), 3000); 
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -77,8 +98,18 @@ const Login = () => {
                 />
               </div>
 
-              <div className="text-center">
+              <div className="text-center mb-3">
                 <button type="submit" className="btn btn-primary">Login</button>
+              </div>
+
+              <div className="text-center">
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  onClick={handleForgotPassword}
+                >
+                  Forgot Password?
+                </button>
               </div>
             </form>
           </div>
