@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { InlineMath } from 'react-katex';
@@ -12,7 +12,7 @@ function TestViewer() {
   const [tests, setTests] = useState([]);
   const [successMessage, setSuccessMessage] = useState("");
   const navigate = useNavigate();
-  const auth = getAuth(); 
+  const auth = getAuth();
 
   useEffect(() => {
     const fetchTests = async () => {
@@ -20,11 +20,11 @@ function TestViewer() {
         const currentUser = auth.currentUser;
 
         if (currentUser) {
-          const userId = currentUser.uid; 
+          const userId = currentUser.uid;
 
           const q = query(collection(db, "tests"), where("userId", "==", userId));
           const querySnapshot = await getDocs(q);
-          
+
           const testData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), published: false }));
           setTests(testData);
         } else {
@@ -36,11 +36,11 @@ function TestViewer() {
     };
 
     fetchTests();
-  }, [auth]); 
+  }, [auth]);
 
   const handlePublish = async (testId) => {
     try {
-      const updatedTests = tests.map(test => 
+      const updatedTests = tests.map(test =>
         test.id === testId ? { ...test, published: !test.published } : test
       );
       setTests(updatedTests);
@@ -53,6 +53,15 @@ function TestViewer() {
 
   const handleEditTest = (testId) => {
     navigate(`/edit-test/${testId}`);
+  };
+
+  const handleDeleteTest = async (testId) => {
+    try {
+      await deleteDoc(doc(db, "tests", testId));
+      setTests(tests.filter(test => test.id !== testId));
+    } catch (error) {
+      console.error("Error deleting test:", error);
+    }
   };
 
   return (
@@ -74,12 +83,22 @@ function TestViewer() {
               <div key={test.id} className="card m-2" style={{ width: "22rem" }}>
                 <div className="card-body d-flex flex-column">
                   <h4 className="card-title">{test.testName}</h4>
+                  <button
+                    className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
+                    onClick={() => handleDeleteTest(test.id)}
+                  >
+                    X
+                  </button>
 
-                  <div 
+                  {test.className && (
+                    <p className="text-muted"><strong>Assigned to:</strong> {test.className}</p>
+                  )}
+
+                  <div
                     className="border p-2 mb-3"
-                    style={{ 
-                      maxHeight: "300px", 
-                      overflowY: "auto", 
+                    style={{
+                      maxHeight: "300px",
+                      overflowY: "auto",
                       backgroundColor: "#f8f9fa",
                       borderRadius: "5px"
                     }}
@@ -91,7 +110,7 @@ function TestViewer() {
                             <strong>Q{index + 1}:</strong> <InlineMath math={q.text} />
 
                             {q.choices && q.choices.length > 0 && (
-                              <div 
+                              <div
                                 className="border rounded mt-2"
                                 style={{
                                   maxHeight: "120px",
@@ -105,7 +124,7 @@ function TestViewer() {
                                       key={choiceIndex}
                                       className={`list-group-item ${q.correctAnswer === String.fromCharCode(97 + choiceIndex) ? "bg-success text-white" : ""}`}
                                       style={{
-                                        border: "none", 
+                                        border: "none",
                                         padding: "8px"
                                       }}
                                     >
@@ -140,20 +159,20 @@ function TestViewer() {
                     </li>
                   </ul>
 
-                  <button 
+                  <button
                     className={`btn btn-small mt-3 ${test.published ? "btn-success" : "btn-primary"}`}
                     onClick={() => handlePublish(test.id)}
                   >
                     {test.published ? "Published!" : "Publish"}
                   </button>
-                  <button 
+                  <button
                     className="btn btn-small btn-secondary mt-3"
                     onClick={() => handleEditTest(test.id)}
                   >
                     Edit Test
                   </button>
                 </div>
-              </div>            
+              </div>
             ))}
           </div>
         </div>

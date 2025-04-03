@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { db } from "./firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { getAuth } from "firebase/auth"; 
 import { InlineMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
@@ -37,6 +37,16 @@ function ViewItems() {
     fetchItems();
   }, [auth]);
 
+  const handleDeleteItem = async (itemId) => {
+    try {
+      await deleteDoc(doc(db, "items", itemId));
+      setItems(items.filter(item => item.id !== itemId)); 
+      console.log("Item deleted successfully");
+    } catch (error) {
+      console.error("Error deleting item: ", error);
+    }
+  };
+
   return (
     <div className="container-fluid">
       <header className="jumbotron jumbotron-fluid bg-light text-center">
@@ -47,7 +57,15 @@ function ViewItems() {
         <div className="row">
           {items.map((item) => (
             <div key={item.id} className="col-md-6 mb-4">
-              <div className="card">
+              <div className="card position-relative">
+                
+                <button 
+                  className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
+                  onClick={() => handleDeleteItem(item.id)}
+                >
+                  X
+                </button>
+
                 <div className="card-body">
                   <h5 className="card-title">{item.title}</h5>
                   <p className="card-text"><InlineMath math={item.text} /></p>

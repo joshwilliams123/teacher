@@ -7,9 +7,9 @@ import { getAuth } from "firebase/auth";
 import { InlineMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
-
 function CreateTest() {
   const [successMessage, setSuccessMessage] = useState(false);
+  const [className, setClassName] = useState("");  
   const [testName, setTestName] = useState("");
   const [items, setItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -48,6 +48,7 @@ function CreateTest() {
 
     try {
       await addDoc(collection(db, "tests"), {
+        className: className,  
         testName: testName,
         questions: selectedItems,
         userId: currentUser.uid,  
@@ -80,12 +81,22 @@ function CreateTest() {
       </header>
       <main className="container">
         <form onSubmit={handleSaveTest}>
+          
+          <div className="form-group mb-4">
+            <label htmlFor="class-name">Class Name</label>
+            <input
+              id="class-name"
+              className="form-control"
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+            />
+          </div>
+
           <div className="form-group mb-4">
             <label htmlFor="test-name">Test Name</label>
             <input
               id="test-name"
               className="form-control"
-              placeholder="Ex: The Normal Curve"
               value={testName}
               onChange={(e) => setTestName(e.target.value)}
             />

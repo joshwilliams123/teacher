@@ -12,10 +12,9 @@ function CreateItem() {
     const [item, setItem] = useState({
         title: "",
         text: "",
-        choices: ["", ""],
+        choices: ["", ""], 
         correctAnswer: "a",
-        imageUrl: "",
-        choiceImages: ["", ""]
+        imageUrl: ""
     });
     const [successMessage, setSuccessMessage] = useState(false);
     const [user, setUser] = useState(null);
@@ -40,10 +39,21 @@ function CreateItem() {
         setItem(prevItem => ({ ...prevItem, choices: newChoices }));
     };
 
+    const handleDeleteChoice = (index) => {
+        if (item.choices.length > 2) { 
+            const newChoices = item.choices.filter((_, i) => i !== index);
+            setItem(prevItem => ({
+                ...prevItem,
+                choices: newChoices,
+                correctAnswer: newChoices.length > 0 ? "a" : "" 
+            }));
+        }
+    };
+
     const handleImageUpload = (event) => {
         const file = event.target.files[0];
         if (!file) return;
-    
+
         new Compressor(file, {
             quality: 0.6, 
             maxWidth: 800, 
@@ -51,11 +61,10 @@ function CreateItem() {
             success(result) {
                 const reader = new FileReader();
                 reader.readAsDataURL(result);
-    
+
                 reader.onload = () => {
                     const base64String = reader.result;
                     setItem(prevItem => ({ ...prevItem, imageUrl: base64String }));
-                    console.log("Image compressed and converted to Base64:", base64String.substring(0, 100));
                 };
             },
             error(err) {
@@ -63,38 +72,9 @@ function CreateItem() {
             }
         });
     };
-    
-    const handleChoiceImageUpload = (event, index) => {
-        const file = event.target.files[0];
-        if (!file) return;
-    
-        new Compressor(file, {
-            quality: 0.6,
-            maxWidth: 800,
-            maxHeight: 600,
-            success(result) {
-                const reader = new FileReader();
-                reader.readAsDataURL(result);
-    
-                reader.onload = () => {
-                    const base64String = reader.result;
-                    setItem((prevItem) => {
-                        const updatedChoiceImages = [...prevItem.choiceImages];
-                        updatedChoiceImages[index] = base64String;
-    
-                        return { ...prevItem, choiceImages: updatedChoiceImages };
-                    });
-                    console.log(`Choice ${index + 1} image compressed and converted to Base64:`, base64String.substring(0, 100));
-                };
-            },
-            error(err) {
-                console.error("Error compressing choice image:", err);
-            }
-        });
-    };
 
     const handleAddOption = () => {
-        setItem(prevItem => ({ ...prevItem, choices: [...prevItem.choices, ""], choiceImages: [...prevItem.choiceImages, ""] }));
+        setItem(prevItem => ({ ...prevItem, choices: [...prevItem.choices, ""] }));
     };
 
     const handleSaveItem = async (e) => {
@@ -160,7 +140,7 @@ function CreateItem() {
                             type="file"
                             className="form-control"
                             accept="image/*"
-                            onChange={(e) => handleImageUpload(e, "imageUrl")}
+                            onChange={handleImageUpload}
                         />
                         {item.imageUrl && (
                             <div className="mt-2">
@@ -170,14 +150,20 @@ function CreateItem() {
                     </div>
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
-                            <li key={index} className="list-group-item border-0" style={getChoiceStyle(index)}>
+                            <li key={index} className="list-group-item border-0 position-relative" style={getChoiceStyle(index)}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger btn-sm position-absolute top-0 end-0" 
+                                    onClick={() => handleDeleteChoice(index)}
+                                >
+                                    X
+                                </button>
                                 <input
                                     className="form-control mb-2"
                                     placeholder={`Answer Choice ${index + 1}`}
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-
                                 <div className="mt-2 p-2 border" style={{
                                     overflowX: "auto",
                                     wordWrap: "break-word",
@@ -186,28 +172,9 @@ function CreateItem() {
                                 }}>
                                     <InlineMath>{choice}</InlineMath>
                                 </div>
-
-                                <input
-                                    type="file"
-                                    className="form-control mt-2"
-                                    accept="image/*"
-                                    onChange={(e) => handleChoiceImageUpload(e, index)}
-                                />
-
-                                {item.choiceImages[index] && (
-                                    <div className="mt-2">
-                                        <img
-                                            src={item.choiceImages[index]}
-                                            alt={`Choice ${index + 1}`}
-                                            className="img-fluid rounded"
-                                            style={{ maxHeight: "100px", objectFit: "contain" }}
-                                        />
-                                    </div>
-                                )}
                             </li>
                         ))}
                     </ol>
-
 
                     <button
                         type="button"
@@ -216,6 +183,7 @@ function CreateItem() {
                     >
                         Add Option
                     </button>
+
                     <h6 className="mt-3">Correct Answer:</h6>
                     <select
                         className="form-select"
@@ -228,10 +196,12 @@ function CreateItem() {
                             </option>
                         ))}
                     </select>
+
                     <div className="mb-4 mt-3">
                         <button type="submit" className="btn btn-primary btn-lg">Save Item</button>
                     </div>
                 </form>
+
                 {successMessage && (
                     <div className="alert alert-success text-center">
                         <p>Your item was saved successfully!</p>

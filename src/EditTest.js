@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
-import { doc, getDoc, updateDoc} from "firebase/firestore";
-import { db } from './firebase'; 
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from './firebase';
 import { useParams } from "react-router-dom";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
@@ -86,7 +86,7 @@ function EditTest() {
             text: "Enter question text here.",
             choices: ["", ""],
             correctAnswer: "a",
-            imageUrl: "", 
+            imageUrl: "",
         };
         setQuestions([...questions, newQuestion]);
     };
@@ -104,7 +104,7 @@ function EditTest() {
         const storage = getStorage();
         const storagePath = `test-images/${testId}/${file.name}`;
         const imageRef = storageRef(storage, storagePath);
-        
+
         const uploadTask = uploadBytesResumable(imageRef, file);
 
         uploadTask.on(
@@ -126,6 +126,12 @@ function EditTest() {
                 setQuestions(newQuestions);
             }
         );
+    };
+
+    const handleDeleteQuestion = (questionIndex) => {
+        const newQuestions = [...questions];
+        newQuestions.splice(questionIndex, 1);
+        setQuestions(newQuestions);
     };
 
     return (
@@ -150,8 +156,14 @@ function EditTest() {
                         <div key={question.id} className="form-group mb-4">
                             <div className="card">
                                 <div className="card-body">
+                                <button
+                                        type="button"
+                                        className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
+                                        onClick={() => handleDeleteQuestion(questionIndex)}
+                                    >
+                                        X
+                                    </button>
                                     <h3 className="card-title">{questionIndex + 1}.</h3>
-
                                     <input
                                         className="form-control mb-3"
                                         placeholder="Question Title (optional)"
@@ -191,8 +203,8 @@ function EditTest() {
                                     </div>
 
                                     <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
-                                                                <BlockMath>{question.text}</BlockMath>
-                                                            </div>
+                                        <BlockMath>{question.text}</BlockMath>
+                                    </div>
 
                                     <ol type="a" className="list-group">
                                         {question.choices.map((choice, choiceIndex) => (
@@ -205,13 +217,13 @@ function EditTest() {
                                                     style={getChoiceStyle(questionIndex, choiceIndex)}
                                                 />
                                                 <div className="mt-2 p-2 border" style={{
-                                                                                    overflowX: "auto",
-                                                                                    wordWrap: "break-word",
-                                                                                    maxWidth: "100%",
-                                                                                    whiteSpace: "normal"
-                                                                                }}>
-                                                                                    <InlineMath>{choice}</InlineMath>
-                                                                                </div>
+                                                    overflowX: "auto",
+                                                    wordWrap: "break-word",
+                                                    maxWidth: "100%",
+                                                    whiteSpace: "normal"
+                                                }}>
+                                                    <InlineMath>{choice}</InlineMath>
+                                                </div>
                                             </li>
                                         ))}
                                     </ol>
