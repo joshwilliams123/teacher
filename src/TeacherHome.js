@@ -26,12 +26,12 @@ function TeacherHome() {
 
           <div className="col-md-4">
             <div className="card">
-              <a href="/monitor-progress" className="text-decoration-none text-dark">
+              <Link to="/monitor-progress" className="text-decoration-none text-dark">
                 <div className="card-body text-center">
                   <i className="bi bi-tv display-4"></i>
                   <h4 className="card-title mt-2">Monitor Student Progress</h4>
                 </div>
-              </a>
+              </Link>
             </div>
           </div>
         </div>

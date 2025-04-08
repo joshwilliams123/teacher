@@ -108,7 +108,17 @@ function CreateTest() {
               {items.map((item) => (
                 <li key={item.id} className="list-group-item">
                   <strong>{item.title}</strong>
-                  <p><InlineMath math={item.text} /></p>
+                  <div 
+                    className="p-2 border rounded my-2"
+                    style={{ 
+                      overflowX: "auto", 
+                      wordWrap: "break-word", 
+                      maxWidth: "100%", 
+                      whiteSpace: "normal" 
+                    }}
+                  >
+                    <InlineMath>{item.text}</InlineMath>
+                  </div>
 
                   {item.choices && item.choices.length > 0 && (
                     <div 
@@ -160,7 +170,17 @@ function CreateTest() {
               {selectedItems.map((item) => (
                 <li key={item.id} className="list-group-item">
                   <strong>{item.title}</strong>
-                  <p>{item.text}</p>
+                  <div 
+                    className="p-2 border rounded my-2"
+                    style={{ 
+                      overflowX: "auto", 
+                      wordWrap: "break-word", 
+                      maxWidth: "100%", 
+                      whiteSpace: "normal" 
+                    }}
+                  >
+                    <InlineMath>{item.text}</InlineMath>
+                  </div>
                   <button
                     type="button"
                     className="btn btn-danger btn-sm"

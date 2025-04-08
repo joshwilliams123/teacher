@@ -17,8 +17,7 @@ function EditItem() {
         text: "",
         choices: ["", ""],
         correctAnswer: "a",
-        imageUrl: "",
-        choiceImages: ["", ""]
+        imageUrl: ""
     });
     const auth = getAuth();
 
@@ -28,7 +27,14 @@ function EditItem() {
                 const itemRef = doc(db, "items", itemId);
                 const itemSnap = await getDoc(itemRef);
                 if (itemSnap.exists()) {
-                    setItem(itemSnap.data());
+                    const data = itemSnap.data();
+                    setItem({
+                        title: data.title || "",
+                        text: data.text || "",
+                        choices: data.choices || ["", ""],
+                        correctAnswer: data.correctAnswer || "a",
+                        imageUrl: data.imageUrl || ""
+                    });
                 }
             } catch (error) {
                 console.error("Error fetching item: ", error);
@@ -47,23 +53,6 @@ function EditItem() {
         setItem(prevItem => ({ ...prevItem, choices: newChoices }));
     };
 
-    const handleChoiceImageUpload = (event, index) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-
-        reader.onload = () => {
-            const base64String = reader.result;
-            setItem((prevItem) => {
-                const updatedChoiceImages = [...prevItem.choiceImages];
-                updatedChoiceImages[index] = base64String;
-                return { ...prevItem, choiceImages: updatedChoiceImages };
-            });
-        };
-    };
-
     const handleImageUpload = (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -80,8 +69,27 @@ function EditItem() {
     const handleAddOption = () => {
         setItem(prevItem => ({
             ...prevItem,
-            choices: [...prevItem.choices, ""],
-            choiceImages: [...prevItem.choiceImages, ""]
+            choices: [...prevItem.choices, ""]
+        }));
+    };
+
+    const handleDeleteOption = (indexToRemove) => {
+        if (item.choices.length <= 2) return;
+
+        const newChoices = item.choices.filter((_, index) => index !== indexToRemove);
+
+        let newCorrectAnswer = item.correctAnswer;
+        const correctIndex = item.correctAnswer.charCodeAt(0) - 97;
+        if (indexToRemove < correctIndex) {
+            newCorrectAnswer = String.fromCharCode(correctIndex - 1 + 97);
+        } else if (indexToRemove === correctIndex) {
+            newCorrectAnswer = "a";
+        }
+
+        setItem(prevItem => ({
+            ...prevItem,
+            choices: newChoices,
+            correctAnswer: newCorrectAnswer
         }));
     };
 
@@ -108,21 +116,31 @@ function EditItem() {
             : {};
     };
 
-
     return (
         <div className="container-fluid">
-            <header className="jumbotron jumbotron-fluid bg-light text-center">
-                <h1>Edit Item</h1>
+            <header>
+                <div className="jumbotron jumbotron-fluid bg-light text-center">
+                    <h1>Edit Item</h1>
+                </div>
             </header>
             <main className="container">
                 <form onSubmit={handleSaveItem}>
                     <div className="form-group mb-4">
                         <label>Question Title</label>
-                        <input className="form-control" value={item.title} onChange={(e) => handleInputChange("title", e.target.value)} />
+                        <input
+                            className="form-control"
+                            value={item.title}
+                            onChange={(e) => handleInputChange("title", e.target.value)}
+                        />
                     </div>
                     <div className="form-group mb-4">
                         <label>Question Text</label>
-                        <textarea className="form-control" rows="5" value={item.text} onChange={(e) => handleInputChange("text", e.target.value)} />
+                        <textarea
+                            className="form-control"
+                            rows="5"
+                            value={item.text}
+                            onChange={(e) => handleInputChange("text", e.target.value)}
+                        />
                         <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
                             <BlockMath>{item.text}</BlockMath>
                         </div>
@@ -130,13 +148,29 @@ function EditItem() {
                     <div className="mb-3">
                         <label>Upload Question Image:</label>
                         <input type="file" className="form-control" accept="image/*" onChange={handleImageUpload} />
-                        {item.imageUrl && <img src={item.imageUrl} alt="Question" className="img-fluid mt-2" style={{ maxHeight: "200px" }} />}
+                        {item.imageUrl && (
+                            <div className="mt-2">
+                                <img src={item.imageUrl} alt="Question" className="img-fluid" style={{ maxHeight: "200px" }} />
+                            </div>
+                        )}
                     </div>
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
-                            <li key={index} className="list-group-item border-0" style={getChoiceStyle(index)}>
+                            <li key={index} className="list-group-item position-relative border rounded mb-3" style={getChoiceStyle(index)}>
+                                {item.choices.length > 2 && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger btn-sm position-absolute"
+                                        style={{ top: "5px", right: "5px", zIndex: 1 }}
+                                        onClick={() => handleDeleteOption(index)}
+                                        aria-label={`Delete choice ${String.fromCharCode(97 + index)}`}
+                                    >
+                                        &times;
+                                    </button>
+                                )}
                                 <input
                                     className="form-control mb-2"
+                                    placeholder={`Answer Choice ${index + 1}`}
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
@@ -148,24 +182,38 @@ function EditItem() {
                                 }}>
                                     <InlineMath>{choice}</InlineMath>
                                 </div>
-                                <input type="file" className="form-control mt-2" accept="image/*" onChange={(e) => handleChoiceImageUpload(e, index)} />
-                                {item.choiceImages[index] && <img src={item.choiceImages[index]} alt={`Choice ${index + 1}`} className="img-fluid mt-2" style={{ maxHeight: "100px" }} />}
                             </li>
                         ))}
                     </ol>
-                    <button type="button" className="btn btn-primary btn-sm mt-3" onClick={handleAddOption}>Add Option</button>
+
+
+                    <button type="button" className="btn btn-primary btn-sm mt-3" onClick={handleAddOption}>
+                        Add Option
+                    </button>
+
                     <h6 className="mt-3">Correct Answer:</h6>
-                    <select className="form-select" value={item.correctAnswer} onChange={(e) => handleInputChange("correctAnswer", e.target.value)}>
+                    <select
+                        className="form-select"
+                        value={item.correctAnswer}
+                        onChange={(e) => handleInputChange("correctAnswer", e.target.value)}
+                    >
                         {item.choices.map((_, index) => (
-                            <option key={index} value={String.fromCharCode(97 + index)}>{String.fromCharCode(97 + index)}</option>
+                            <option key={index} value={String.fromCharCode(97 + index)}>
+                                {String.fromCharCode(97 + index)}
+                            </option>
                         ))}
                     </select>
+
                     <div className="mb-4 mt-4">
                         <button type="submit" className="btn btn-primary btn-lg">Save Changes</button>
                     </div>
                 </form>
+                {successMessage && (
+                    <div className="alert alert-success text-center">
+                        Item updated successfully!
+                    </div>
+                )}
             </main>
-            {successMessage && <div className="alert alert-success text-center">Item updated successfully!</div>}
         </div>
     );
 }
