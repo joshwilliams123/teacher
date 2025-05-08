@@ -9,6 +9,8 @@ import monitorImg from "./imgs/monitor.png";
 import pencilImg from "./imgs/pencil.png";
 import itemImg from "./imgs/itemcreate.png";
 import pastImg from "./imgs/past_tests.png";
+import classImg from "./imgs/class.png";
+import checkImg from "./imgs/check.png";
 
 const Sidebar = () => {
   const [user, setUser] = useState(null);
@@ -36,27 +38,35 @@ const Sidebar = () => {
       {user && (
         <>
           <Link to="/teacher-home" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={homeImg} alt="home" className="img-fluid" style={{ width: "50px", height: "50px" }} />
+            <img src={homeImg} alt="home" className="img-fluid" style={{ width: "28px", height: "28px" }} />
             <p style={{ color: 'black' }}>Home</p>
           </Link>
+          <Link to="/add-classes" className="text-center text-decoration-none" style={{ color: 'white' }}>
+            <img src={classImg} alt="add classes" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <p style={{ color: 'black' }}>Add Classes</p>
+          </Link>
           <Link to="/create-item" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={pencilImg} alt="home" className="img-fluid" style={{ width: "50px", height: "50px" }} />
+            <img src={pencilImg} alt="create item" className="img-fluid" style={{ width: "28px", height: "28px" }} />
             <p style={{ color: 'black' }}>Create Item</p>
           </Link>
           <Link to="/create-test" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={itemImg} alt="create tests" className="img-fluid" style={{ width: "50px", height: "50px" }} />
+            <img src={itemImg} alt="create tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
             <p style={{ color: 'black' }}>Create Tests</p>
           </Link>
           <Link to="/view-items" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={testImg} alt="create tests" className="img-fluid" style={{ width: "50px", height: "50px" }} />
-            <p style={{ color: 'black' }}>View/Edit Items</p>
+            <img src={testImg} alt="view tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <p style={{ color: 'black' }}>View Items</p>
           </Link>
           <Link to="/test-viewer" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={pastImg} alt="edit and publish tests" className="img-fluid" style={{ width: "50px", height: "50px" }} />
-            <p style={{ color: 'black' }}>View/Edit Tests</p>
+            <img src={pastImg} alt="edit and publish tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <p style={{ color: 'black' }}>View Tests</p>
+          </Link>
+          <Link to="/published-tests" className="text-center text-decoration-none" style={{ color: 'white' }}>
+            <img src={checkImg} alt="edit and publish tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <p style={{ color: 'black' }}>Published Tests</p>
           </Link>
           <Link to="/monitor-progress" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={monitorImg} alt="monitor test progress" className="img-fluid" style={{ width: "50px", height: "50px" }} />
+            <img src={monitorImg} alt="monitor test progress" className="img-fluid" style={{ width: "28px", height: "28px" }} />
             <p style={{ color: 'black' }}>Monitor Test Progress</p>
           </Link>
         </>
