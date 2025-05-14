@@ -34,39 +34,39 @@ const Sidebar = () => {
   };
 
   return (
-    <nav className="d-flex flex-column vh-100 p-3" style={{ width: "200px", backgroundColor: "#A45EE5" }}>
+    <nav className="d-flex flex-column p-3" style={{ width: "200px", backgroundColor: "#A45EE5", minHeight: "100vh" }}>
       {user && (
         <>
           <Link to="/teacher-home" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={homeImg} alt="home" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={homeImg} alt="home" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Home</p>
           </Link>
           <Link to="/add-classes" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={classImg} alt="add classes" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={classImg} alt="add classes" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Add Classes</p>
           </Link>
           <Link to="/create-item" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={pencilImg} alt="create item" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={pencilImg} alt="create item" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Create Item</p>
           </Link>
           <Link to="/create-test" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={itemImg} alt="create tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={itemImg} alt="create tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Create Tests</p>
           </Link>
           <Link to="/view-items" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
-            <img src={testImg} alt="view tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={testImg} alt="view tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>View Items</p>
           </Link>
           <Link to="/test-viewer" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={pastImg} alt="edit and publish tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={pastImg} alt="edit and publish tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>View Tests</p>
           </Link>
           <Link to="/published-tests" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={checkImg} alt="edit and publish tests" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={checkImg} alt="edit and publish tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Published Tests</p>
           </Link>
           <Link to="/monitor-progress" className="text-center text-decoration-none" style={{ color: 'white' }}>
-            <img src={monitorImg} alt="monitor test progress" className="img-fluid" style={{ width: "28px", height: "28px" }} />
+            <img src={monitorImg} alt="monitor test progress" className="img-fluid" style={{ width: "35px", height: "35px" }} />
             <p style={{ color: 'black' }}>Monitor Test Progress</p>
           </Link>
         </>

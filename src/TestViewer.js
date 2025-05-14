@@ -21,6 +21,8 @@ function TestViewer() {
   const [successMessage, setSuccessMessage] = useState("");
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewTest, setPreviewTest] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
   const [selectedClassesToPublish, setSelectedClassesToPublish] = useState([]);
 
@@ -64,6 +66,9 @@ function TestViewer() {
   };
 
   const handleDeleteTest = async (testId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this test?");
+    if (!confirmed) return;
+
     try {
       await deleteDoc(doc(db, "tests", testId));
       setTests(tests.filter((test) => test.id !== testId));
@@ -71,6 +76,7 @@ function TestViewer() {
       console.error("Error deleting test:", error);
     }
   };
+
 
   const openPublishModal = (test) => {
     setSelectedTest(test);
@@ -102,6 +108,11 @@ function TestViewer() {
     }
   };
 
+  const openPreviewModal = (test) => {
+    setPreviewTest(test);
+    setShowPreviewModal(true);
+  };
+
   const getClassNameById = (id) => {
     const found = allClasses.find((cls) => cls.id === id);
     return found ? found.name || found.className : "Unknown Class";
@@ -130,7 +141,7 @@ function TestViewer() {
             <div className="alert alert-success text-center">{successMessage}</div>
           )}
 
-          <div className="card-deck d-flex flex-wrap justify-content-start mt-5">
+          <div className="d-flex flex-column gap-3 mt-4">
             {tests.map((test) => {
               const assignedClassIds = (test.classNames || [])
                 .map(getClassIdByName)
@@ -142,145 +153,67 @@ function TestViewer() {
               const totalAssigned = assignedClassIds.length;
               const fullyPublished = totalAssigned > 0 && publishedCount === totalAssigned;
               const partiallyPublished = publishedCount > 0 && !fullyPublished;
-              const percent = totalAssigned > 0 ? (publishedCount / totalAssigned) * 100 : 0;
 
               return (
-                <div key={test.id} className="card m-2" style={{ width: "22rem" }}>
-                  <div className="card-body d-flex flex-column position-relative">
-                    <h4 className="card-title">{test.testName}</h4>
-                    <button
-                      className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
-                      onClick={() => handleDeleteTest(test.id)}
-                    >
-                      X
-                    </button>
-
+                <div
+                  key={test.id}
+                  className="card d-flex flex-row align-items-start"
+                  style={{
+                    width: "100%",
+                    maxWidth: "1000px",
+                    minHeight: "150px",
+                    padding: "15px",
+                    gap: "20px",
+                  }}
+                >
+                  <div className="flex-grow-1">
+                    <h4 className="card-title mb-2">{test.testName}</h4>
                     {test.classNames && (
-                      <p className="text-muted">
+                      <p className="text-muted mb-1">
                         <strong>Assigned to:</strong> {test.classNames.join(", ")}
                       </p>
                     )}
-
                     {test.publishedTo && test.publishedTo.length > 0 && (
-                      <p className="text-success">
+                      <p className="text-success mb-1">
                         <strong>Published to:</strong>{" "}
                         {test.publishedTo.map(getClassNameById).join(", ")}
                       </p>
                     )}
+                    <p className="mb-1">{test.questions.length} questions</p>
+                  </div>
 
-                    <div
-                      className="border p-2 mb-3"
-                      style={{
-                        maxHeight: "300px",
-                        overflowY: "auto",
-                        backgroundColor: "#f8f9fa",
-                        borderRadius: "5px",
-                      }}
-                    >
-                      {test.questions && test.questions.length > 0 ? (
-                        <ul className="list-group list-group-flush">
-                          {test.questions.map((q, index) => (
-                            <li key={index} className="list-group-item">
-                              <strong>Q{index + 1}:</strong> <InlineMath math={q.text} />
-                              {q.choices && q.choices.length > 0 && (
-                                <div
-                                  className="border rounded mt-2"
-                                  style={{
-                                    maxHeight: "120px",
-                                    overflowY: "auto",
-                                    backgroundColor: "#f1f1f1",
-                                  }}
-                                >
-                                  <ol type="a" className="list-group list-group-flush">
-                                    {q.choices.map((choice, choiceIndex) => (
-                                      <li
-                                        key={choiceIndex}
-                                        className={`list-group-item ${
-                                          q.correctAnswer ===
-                                          String.fromCharCode(97 + choiceIndex)
-                                            ? "bg-success text-white"
-                                            : ""
-                                        }`}
-                                        style={{ border: "none", padding: "8px" }}
-                                      >
-                                        <InlineMath math={choice} />
-                                        {q.choiceImages &&
-                                          q.choiceImages[choiceIndex] && (
-                                            <div className="mt-2">
-                                              <img
-                                                src={q.choiceImages[choiceIndex]}
-                                                alt={`Choice ${choiceIndex + 1}`}
-                                                className="img-fluid rounded"
-                                                style={{
-                                                  maxHeight: "60px",
-                                                  objectFit: "contain",
-                                                }}
-                                              />
-                                            </div>
-                                          )}
-                                      </li>
-                                    ))}
-                                  </ol>
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-muted text-center">No questions available</p>
-                      )}
-                    </div>
-
-                    <ul className="list-group list-group-flush">
-                      <li className="list-group-item">{test.questions.length} questions</li>
-                      <li
-                        className={`list-group-item ${
-                          test.published ? "text-success" : "text-danger"
-                        }`}
-                      >
-                        {test.published ? "Published" : "Not Published"}
-                      </li>
-                    </ul>
-
+                  <div className="d-flex flex-column gap-2">
                     <button
-                      className={`btn mt-3 position-relative ${
-                        fullyPublished
-                          ? "btn-success"
-                          : partiallyPublished
-                          ? "btn-warning"
-                          : "btn-primary"
-                      }`}
-                      onClick={() => openPublishModal(test)}
+                      className="btn btn-info btn-sm"
+                      onClick={() => openPreviewModal(test)}
                     >
-                      {fullyPublished ? "Fully Published" : "Publish"}
-                      {partiallyPublished && (
-                        <div
-                          className="progress"
-                          style={{
-                            position: "absolute",
-                            bottom: 0,
-                            left: 0,
-                            height: "5px",
-                            width: "100%",
-                          }}
-                        >
-                          <div
-                            className="progress-bar bg-dark"
-                            role="progressbar"
-                            style={{ width: `${percent}%` }}
-                            aria-valuenow={percent}
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                          />
-                        </div>
-                      )}
+                      Quick Preview
                     </button>
 
                     <button
-                      className="btn btn-small btn-secondary mt-3"
+                      className={`btn btn-sm ${fullyPublished
+                        ? "btn-success"
+                        : partiallyPublished
+                          ? "btn-warning"
+                          : "btn-primary"
+                        }`}
+                      onClick={() => openPublishModal(test)}
+                    >
+                      {fullyPublished ? "Fully Published" : "Publish"}
+                    </button>
+
+                    <button
+                      className="btn btn-secondary btn-sm"
                       onClick={() => handleEditTest(test.id)}
                     >
-                      View Full Test and Edit
+                      View & Edit
+                    </button>
+
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDeleteTest(test.id)}
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -291,21 +224,12 @@ function TestViewer() {
       </main>
 
       {showPublishModal && selectedTest && (
-        <div
-          className="modal d-block"
-          tabIndex="-1"
-          role="dialog"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog" role="document">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Publish Test to Classes</h5>
-                <button
-                  type="button"
-                  className="close"
-                  onClick={() => setShowPublishModal(false)}
-                >
+                <button type="button" className="close" onClick={() => setShowPublishModal(false)}>
                   <span>&times;</span>
                 </button>
               </div>
@@ -313,9 +237,6 @@ function TestViewer() {
                 <p>
                   <strong>Assigned to:</strong>{" "}
                   {selectedTest.classNames?.join(", ") || "N/A"}
-                </p>
-                <p>
-                  <strong>Select Classes to Publish To:</strong>
                 </p>
                 {allClasses
                   .filter((cls) =>
@@ -347,12 +268,60 @@ function TestViewer() {
                 <button className="btn btn-primary" onClick={confirmPublish}>
                   Confirm Publish
                 </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowPublishModal(false)}
-                >
+                <button className="btn btn-secondary" onClick={() => setShowPublishModal(false)}>
                   Cancel
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPreviewModal && previewTest && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg" role="document">
+            <div className="modal-content" style={{ maxHeight: "80vh", overflowY: "auto" }}>
+              <div className="modal-header">
+                <h5 className="modal-title">Quick Preview - {previewTest.testName}</h5>
+                <button type="button" className="close" onClick={() => setShowPreviewModal(false)}>
+                  <span>&times;</span>
+                </button>
+              </div>
+              <div className="modal-body">
+                {previewTest.questions && previewTest.questions.length > 0 ? (
+                  <ul className="list-group list-group-flush">
+                    {previewTest.questions.map((q, index) => (
+                      <li key={index} className="list-group-item">
+                        <strong>Q{index + 1}:</strong>
+                        <div style={{ wordWrap: "break-word", overflowWrap: "break-word", maxWidth: "100%" }}>
+                          <InlineMath math={q.text} />
+                        </div>
+                        {q.choices && (
+                          <ol type="a" className="list-group mt-2">
+                            {q.choices.map((choice, i) => (
+                              <li
+                                key={i}
+                                className={`list-group-item ${q.correctAnswer === String.fromCharCode(97 + i)
+                                  ? "bg-success text-white"
+                                  : ""
+                                  }`}
+                                style={{
+                                  wordWrap: "break-word",
+                                  overflowWrap: "break-word",
+                                  maxWidth: "100%",
+                                }}
+                              >
+                                <InlineMath math={choice} />
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted">No questions available</p>
+                )}
               </div>
             </div>
           </div>
