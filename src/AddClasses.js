@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, collection, addDoc, getDocs, query, where } from "./firebase";
+import { deleteDoc, doc } from "firebase/firestore";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 
@@ -14,13 +15,13 @@ function AddClasses() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-          if (currentUser) {
-            fetchClasses(currentUser.uid);
-          }
+            setUser(currentUser);
+            if (currentUser) {
+                fetchClasses(currentUser.uid);
+            }
         });
         return () => unsubscribe();
-      }, [auth]);
+    }, [auth]);
 
     const fetchClasses = async (userId) => {
         try {
@@ -29,7 +30,7 @@ function AddClasses() {
             const classList = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            }));
+            })).sort((a, b) => a.name.localeCompare(b.name));;
             setClasses(classList);
         } catch (error) {
             console.error("Error fetching classes:", error);
@@ -62,12 +63,25 @@ function AddClasses() {
         }
     };
 
+    const handleDeleteClass = async (classId) => {
+        const confirmDelete = window.confirm("Are you sure you want to delete this class?");
+        if (!confirmDelete) return;
+
+        try {
+            await deleteDoc(doc(db, "classes", classId));
+            fetchClasses(user.uid);
+        } catch (error) {
+            console.error("Error deleting class:", error);
+        }
+    };
+
+
     return (
         <div className="container-fluid">
             <header>
                 <div className="jumbotron jumbotron-fluid bg-light">
                     <div className="container text-center">
-                        <h1>Manage Classes</h1>
+                        <h1>Add Classes</h1>
                     </div>
                 </div>
             </header>
@@ -98,8 +112,19 @@ function AddClasses() {
                 ) : (
                     <ul className="list-group">
                         {classes.map((cls) => (
-                            <li key={cls.id} className="list-group-item">
-                                {cls.name}
+                            <li
+                                key={cls.id}
+                                className="list-group-item d-flex justify-content-between align-items-center"
+                            >
+                                <span>{cls.name}</span>
+                                <button
+                                    className="btn btn-sm btn-danger"
+                                    onClick={() => handleDeleteClass(cls.id)}
+                                    title="Delete class"
+                                    style={{ marginLeft: "auto" }}
+                                >
+                                    &#x2715;
+                                </button>
                             </li>
                         ))}
                     </ul>

@@ -121,22 +121,25 @@ function CreateTest() {
                 className="border rounded bg-white mt-1 p-2 shadow-sm"
                 style={{ position: "absolute", zIndex: 10, width: "100%" }}
               >
-                {classes.map(cls => (
-                  <div key={cls.id} className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id={`class-${cls.id}`}
-                      checked={className.includes(cls.name)}
-                      onChange={() => toggleClassSelection(cls.name)}
-                    />
-                    <label className="form-check-label" htmlFor={`class-${cls.id}`}>
-                      {cls.name}
-                    </label>
-                  </div>
-                ))}
+                {[...classes]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(cls => (
+                    <div key={cls.id} className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={`class-${cls.id}`}
+                        checked={className.includes(cls.name)}
+                        onChange={() => toggleClassSelection(cls.name)}
+                      />
+                      <label className="form-check-label" htmlFor={`class-${cls.id}`}>
+                        {cls.name}
+                      </label>
+                    </div>
+                  ))}
               </div>
             )}
+
           </div>
 
           <div className="form-group mb-4">
@@ -201,48 +204,46 @@ function CreateTest() {
           </div>
 
           <div className="mb-4">
-  <h5>Selected Items</h5>
-  <ul className="list-group">
-    {selectedItems.map((item) => {
-      const correctIndex = item.correctAnswer
-        ? item.correctAnswer.toLowerCase().charCodeAt(0) - 97
-        : null;
-      const correctChoice = correctIndex !== null ? item.choices?.[correctIndex] : null;
+            <h5>Selected Items</h5>
+            <ul className="list-group">
+              {selectedItems.map((item) => {
+                const correctIndex = item.correctAnswer
+                  ? item.correctAnswer.toLowerCase().charCodeAt(0) - 97
+                  : null;
+                const correctChoice = correctIndex !== null ? item.choices?.[correctIndex] : null;
 
-      return (
-        <li key={item.id} className="list-group-item">
-          <strong>{item.title}</strong>
-          <div className="border rounded mt-2 bg-light" style={{ maxHeight: "150px", overflowY: "auto" }}>
-            <div className="p-2">
-              <InlineMath>{item.text}</InlineMath>
-            </div>
+                return (
+                  <li key={item.id} className="list-group-item">
+                    <strong>{item.title}</strong>
+                    <div className="border rounded mt-2 bg-light" style={{ maxHeight: "150px", overflowY: "auto" }}>
+                      <div className="p-2">
+                        <InlineMath>{item.text}</InlineMath>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <span>Correct Answer:</span>
+                      {
+                        <span className="ms-2">
+                          <div className="border rounded mt-2 bg-light" style={{ maxHeight: "150px", overflowY: "auto" }}>
+                            <div className="p-2">
+                              <InlineMath>{correctChoice}</InlineMath>
+                            </div>
+                          </div>
+                        </span>
+                      }
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm mt-2"
+                      onClick={() => handleRemoveItem(item.id)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-          <div className="mt-2">
-            <span>Correct Answer:</span>
-            {
-              <span className="ms-2">
-                <div className="border rounded mt-2 bg-light" style={{ maxHeight: "150px", overflowY: "auto" }}>
-                <div className="p-2">
-                <InlineMath>{correctChoice}</InlineMath>
-                </div>
-          </div>
-              </span>
-            }
-          </div>
-          <button
-            type="button"
-            className="btn btn-danger btn-sm mt-2"
-            onClick={() => handleRemoveItem(item.id)}
-          >
-            Remove
-          </button>
-        </li>
-      );
-    })}
-  </ul>
-</div>
-
-
           <div className="mb-4">
             <button type="submit" className="btn btn-primary btn-lg">
               Save Test

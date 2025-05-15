@@ -170,13 +170,13 @@ function TestViewer() {
                     <h4 className="card-title mb-2">{test.testName}</h4>
                     {test.classNames && (
                       <p className="text-muted mb-1">
-                        <strong>Assigned to:</strong> {test.classNames.join(", ")}
+                        <strong>Assigned to:</strong> {test.classNames.sort().join(", ")}
                       </p>
                     )}
                     {test.publishedTo && test.publishedTo.length > 0 && (
                       <p className="text-success mb-1">
                         <strong>Published to:</strong>{" "}
-                        {test.publishedTo.map(getClassNameById).join(", ")}
+                        {test.publishedTo.map(getClassNameById).sort().join(", ")}
                       </p>
                     )}
                     <p className="mb-1">{test.questions.length} questions</p>

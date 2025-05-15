@@ -19,7 +19,9 @@ function PublishedTests() {
 
       const classQuery = query(collection(db, "classes"), where("userId", "==", currentUser.uid));
       const classSnapshot = await getDocs(classQuery);
-      const classData = classSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const classData = classSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (a.name || a.className).localeCompare(b.name || b.className));
       setAllClasses(classData);
     };
 
@@ -85,7 +87,7 @@ function PublishedTests() {
             <div key={test.id} className="card m-2" style={{ width: "22rem" }}>
               <div className="card-body">
                 <h4 className="card-title">{test.testName}</h4>
-                <p><strong>Published To:</strong> {test.publishedTo.map(getClassNameById).join(", ")}</p>
+                <p><strong>Published To:</strong> {test.publishedTo.map(getClassNameById).sort().join(", ")}</p>
 
                 <div className="border p-2 mb-3" style={{ maxHeight: "250px", overflowY: "auto", backgroundColor: "#f8f9fa" }}>
                   {test.questions && test.questions.length > 0 ? (
