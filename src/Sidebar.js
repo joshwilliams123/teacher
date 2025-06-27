@@ -71,17 +71,8 @@ const Sidebar = () => {
           </Link>
         </>
       )}
-
       <div className="mt-auto text-center">
-        {user ? (
-          <button className="btn btn-light w-100" onClick={handleLogout}>Logout</button>
-        ) : (
-          <>
-            <Link to="/signup" className="btn btn-light w-100 mb-2">Sign Up</Link>
-            <Link to="/login" className="btn btn-light w-100 mb-2">Login</Link>
-          </>
-        )
-        }
+        <button className="btn btn-light w-100" onClick={handleLogout}>Logout</button>
       </div>
     </nav>
   );

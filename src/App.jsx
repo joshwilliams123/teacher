@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import AuthRoute from "./AuthRoute";
@@ -15,29 +15,50 @@ import Signup from "./Signup";
 import Login from "./Login";
 import AddClasses from "./AddClasses";
 import PublishedTests from "./PublishedTests";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "./css/styles.css";
 
 function App() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="d-flex">
-      <Sidebar />
+      {user && <Sidebar />}
       <div className="flex-grow-1 p-4">
         <Routes>
-          <Route path="/" element={<AuthRoute />} />
-          <Route path="/teacher-home" element={<TeacherHome />} />
-          <Route path="/teacher-choice" element={<TeacherChoice />} />
-          <Route path="/create-item" element={<CreateItem />} />
-          <Route path="/create-test" element={<CreateTest />} />
-          <Route path="/view-items" element={<ViewItems />} />
-          <Route path="/monitor-progress" element={<MonitorProgress />} />
-          <Route path="/test-viewer" element={<TestViewer />} />
-          <Route path="/edit-item/:itemId" element={<EditItem />} />
-          <Route path="/edit-test/:testId" element={<EditTest />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/add-classes" element={<AddClasses />} />
-          <Route path="/published-tests" element={<PublishedTests />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {!user ? (
+            <>
+              <Route path="/" element={<AuthRoute />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            <>
+              <Route path="/" element={<Navigate to="/teacher-home" replace />} />
+              <Route path="/teacher-home" element={<TeacherHome />} />
+              <Route path="/teacher-choice" element={<TeacherChoice />} />
+              <Route path="/create-item" element={<CreateItem />} />
+              <Route path="/create-test" element={<CreateTest />} />
+              <Route path="/view-items" element={<ViewItems />} />
+              <Route path="/monitor-progress" element={<MonitorProgress />} />
+              <Route path="/test-viewer" element={<TestViewer />} />
+              <Route path="/edit-item/:itemId" element={<EditItem />} />
+              <Route path="/edit-test/:testId" element={<EditTest />} />
+              <Route path="/add-classes" element={<AddClasses />} />
+              <Route path="/published-tests" element={<PublishedTests />} />
+              <Route path="*" element={<Navigate to="/teacher-home" replace />} />
+            </>
+          )}
         </Routes>
       </div>
     </div>

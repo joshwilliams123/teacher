@@ -1,5 +1,6 @@
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "./css/styles.css"; 
 import { Link } from "react-router-dom";
 
 function AuthRoute() {

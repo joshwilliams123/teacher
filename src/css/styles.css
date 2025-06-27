@@ -1,7 +1,24 @@
+:root {
+  --main-purple: #6f42c1;
+  --main-gold: #ffd700;
+  --purple-dark: #4b286d;
+  --gold-dark: #c9a100;
+  --text-dark: #2d2d2d;
+}
+
 body {
-  font-family: 'Encode Sans', sans-serif;
+  font-family: Georgia, Times, "Times New Roman", serif;
   margin: 0;
   padding: 0;
+  background: #faf8ff;
+  color: var(--text-dark);
+}
+
+h1,
+h3,
+h4,
+h5 {
+  color: var(--main-purple);
 }
 
 .container-fluid {
@@ -24,6 +41,7 @@ main.container {
   border: 1px solid #e9ecef;
   border-radius: 0.5rem;
   margin-bottom: 1.5rem;
+  background: #fff8e1;
 }
 
 .card-body {

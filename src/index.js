@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom'
 import { createRoot } from 'react-dom/client'; 
-import './css/styles.css'; 
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './css/styles.css'; 
 import App from './App';
 import { initializeApp } from "firebase/app";
 
