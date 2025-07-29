@@ -55,15 +55,15 @@ const Sidebar = () => {
           </Link>
           <Link to="/view-items" className="text-center text-decoration-none mb-3" style={{ color: 'white' }}>
             <img src={testImg} alt="view tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
-            <p style={{ color: 'black' }}>View Items</p>
+            <p style={{ color: 'black' }}>Your Items</p>
           </Link>
           <Link to="/test-viewer" className="text-center text-decoration-none" style={{ color: 'white' }}>
             <img src={pastImg} alt="edit and publish tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
-            <p style={{ color: 'black' }}>View Tests</p>
+            <p style={{ color: 'black' }}>Your Tests</p>
           </Link>
           <Link to="/published-tests" className="text-center text-decoration-none" style={{ color: 'white' }}>
             <img src={checkImg} alt="edit and publish tests" className="img-fluid" style={{ width: "35px", height: "35px" }} />
-            <p style={{ color: 'black' }}>Published Tests</p>
+            <p style={{ color: 'black' }}>View Published Tests</p>
           </Link>
           <Link to="/monitor-progress" className="text-center text-decoration-none" style={{ color: 'white' }}>
             <img src={monitorImg} alt="monitor test progress" className="img-fluid" style={{ width: "35px", height: "35px" }} />

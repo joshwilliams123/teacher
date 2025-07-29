@@ -25,6 +25,7 @@ function TestViewer() {
   const [previewTest, setPreviewTest] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
   const [selectedClassesToPublish, setSelectedClassesToPublish] = useState([]);
+  const [publishChanged, setPublishChanged] = useState(false);
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -77,10 +78,10 @@ function TestViewer() {
     }
   };
 
-
   const openPublishModal = (test) => {
     setSelectedTest(test);
     setSelectedClassesToPublish(test.publishedTo || []);
+    setPublishChanged(false);
     setShowPublishModal(true);
   };
 
@@ -88,19 +89,19 @@ function TestViewer() {
     try {
       const testRef = doc(db, "tests", selectedTest.id);
       await updateDoc(testRef, {
-        published: true,
+        published: selectedClassesToPublish.length > 0,
         publishedTo: selectedClassesToPublish,
       });
 
       setTests((prevTests) =>
         prevTests.map((t) =>
           t.id === selectedTest.id
-            ? { ...t, published: true, publishedTo: selectedClassesToPublish }
+            ? { ...t, published: selectedClassesToPublish.length > 0, publishedTo: selectedClassesToPublish }
             : t
         )
       );
 
-      setSuccessMessage("Test published successfully!");
+      setSuccessMessage("Test publishing status updated!");
       setTimeout(() => setSuccessMessage(""), 3000);
       setShowPublishModal(false);
     } catch (error) {
@@ -238,35 +239,57 @@ function TestViewer() {
                   <strong>Assigned to:</strong>{" "}
                   {selectedTest.classNames?.join(", ") || "N/A"}
                 </p>
-                {allClasses
-                  .filter((cls) =>
-                    selectedTest.classNames?.includes(cls.className || cls.name)
-                  )
-                  .map((cls) => (
-                    <div key={cls.id} className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        value={cls.id}
-                        checked={selectedClassesToPublish.includes(cls.id)}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setSelectedClassesToPublish((prev) =>
-                            isChecked
-                              ? [...prev, cls.id]
-                              : prev.filter((id) => id !== cls.id)
+                <p>
+                  <strong>Published to:</strong>{" "}
+                  {selectedTest.publishedTo && selectedTest.publishedTo.length > 0
+                    ? selectedTest.publishedTo.map(getClassNameById).sort().join(", ")
+                    : "None"}
+                </p>
+                <div className="mb-2">
+                  <strong>Change published classes:</strong>
+                </div>
+                {allClasses.map((cls) => (
+                  <div key={cls.id} className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      value={cls.id}
+                      checked={selectedClassesToPublish.includes(cls.id)}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        setSelectedClassesToPublish((prev) => {
+                          const updated = isChecked
+                            ? [...prev, cls.id]
+                            : prev.filter((id) => id !== cls.id);
+                          setPublishChanged(
+                            JSON.stringify(updated.sort()) !==
+                            JSON.stringify((selectedTest.publishedTo || []).sort())
                           );
-                        }}
-                      />
-                      <label className="form-check-label">
-                        {cls.className || cls.name || "Unnamed Class"}
-                      </label>
-                    </div>
-                  ))}
+                          return updated;
+                        });
+                      }}
+                    />
+                    <label className="form-check-label">
+                      {cls.className || cls.name || "Unnamed Class"}
+                    </label>
+                  </div>
+                ))}
+                {publishChanged && (
+                  <div className="alert alert-info mt-3 text-center">
+                    Publishing status has changed. Click Confirm to save.
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
-                <button className="btn btn-primary" onClick={confirmPublish}>
-                  Confirm Publish
+                <button
+                  className="btn btn-primary"
+                  onClick={confirmPublish}
+                  disabled={
+                    JSON.stringify(selectedClassesToPublish.sort()) ===
+                    JSON.stringify((selectedTest.publishedTo || []).sort())
+                  }
+                >
+                  Confirm Changes
                 </button>
                 <button className="btn btn-secondary" onClick={() => setShowPublishModal(false)}>
                   Cancel
