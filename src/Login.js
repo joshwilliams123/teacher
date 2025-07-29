@@ -15,8 +15,8 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError(""); 
-    setSuccessMessage(""); 
+    setError("");
+    setSuccessMessage("");
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -48,7 +48,7 @@ const Login = () => {
     try {
       await sendPasswordResetEmail(auth, email);
       setSuccessMessage("A password reset email has been sent to your inbox.");
-      setTimeout(() => setSuccessMessage(""), 3000); 
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -102,10 +102,15 @@ const Login = () => {
                 <button type="submit" className="btn btn-primary">Login</button>
               </div>
 
+              <div className="mb-3 text-center">
+                <small className="text-muted">
+                  Forgot your password? Enter your email above and click below to receive a reset link.
+                </small>
+              </div>
               <div className="text-center">
-                <button 
-                  type="button" 
-                  className="btn btn-danger" 
+                <button
+                  type="button"
+                  className="btn btn-outline-danger"
                   onClick={handleForgotPassword}
                 >
                   Forgot Password?
