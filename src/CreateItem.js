@@ -6,7 +6,6 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import Compressor from 'compressorjs';
 
 function CreateItem() {
     const [item, setItem] = useState({
@@ -50,28 +49,6 @@ function CreateItem() {
         }
     };
 
-    const handleImageUpload = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        new Compressor(file, {
-            quality: 0.6, 
-            maxWidth: 800, 
-            maxHeight: 600,
-            success(result) {
-                const reader = new FileReader();
-                reader.readAsDataURL(result);
-
-                reader.onload = () => {
-                    const base64String = reader.result;
-                    setItem(prevItem => ({ ...prevItem, imageUrl: base64String }));
-                };
-            },
-            error(err) {
-                console.error("Error compressing image:", err);
-            }
-        });
-    };
 
     const handleAddOption = () => {
         setItem(prevItem => ({ ...prevItem, choices: [...prevItem.choices, ""] }));
@@ -133,20 +110,6 @@ function CreateItem() {
                         <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
                             <BlockMath>{item.text}</BlockMath>
                         </div>
-                    </div>
-                    <div className="mb-3">
-                        <label className="form-label">Upload Question Image:</label>
-                        <input
-                            type="file"
-                            className="form-control"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                        />
-                        {item.imageUrl && (
-                            <div className="mt-2">
-                                <img src={item.imageUrl} alt="Question" className="img-fluid" style={{ maxHeight: "200px" }} />
-                            </div>
-                        )}
                     </div>
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (

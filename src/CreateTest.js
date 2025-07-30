@@ -15,7 +15,9 @@ function CreateTest() {
   const [items, setItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [classError, setClassError] = useState(false);
   const dropdownRef = useRef(null);
+  const classErrorRef = useRef(null);
 
   const auth = getAuth();
   const navigate = useNavigate();
@@ -53,11 +55,23 @@ function CreateTest() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (classError && classErrorRef.current) {
+      classErrorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [classError]);
+
   const handleSaveTest = async (e) => {
     e.preventDefault();
+    setClassError(false);
     const currentUser = auth.currentUser;
 
     if (!currentUser) return;
+
+    if (className.length === 0) {
+      setClassError(true);
+      return;
+    }
 
     try {
       await addDoc(collection(db, "tests"), {
@@ -139,7 +153,11 @@ function CreateTest() {
                   ))}
               </div>
             )}
-
+            {classError && (
+              <div className="text-danger mt-2" ref={classErrorRef}>
+                You must assign a test to at least one class.
+              </div>
+            )}
           </div>
 
           <div className="form-group mb-4">

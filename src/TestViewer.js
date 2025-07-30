@@ -248,32 +248,39 @@ function TestViewer() {
                 <div className="mb-2">
                   <strong>Change published classes:</strong>
                 </div>
-                {allClasses.map((cls) => (
-                  <div key={cls.id} className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      value={cls.id}
-                      checked={selectedClassesToPublish.includes(cls.id)}
-                      onChange={(e) => {
-                        const isChecked = e.target.checked;
-                        setSelectedClassesToPublish((prev) => {
-                          const updated = isChecked
-                            ? [...prev, cls.id]
-                            : prev.filter((id) => id !== cls.id);
-                          setPublishChanged(
-                            JSON.stringify(updated.sort()) !==
-                            JSON.stringify((selectedTest.publishedTo || []).sort())
-                          );
-                          return updated;
-                        });
-                      }}
-                    />
-                    <label className="form-check-label">
-                      {cls.className || cls.name || "Unnamed Class"}
-                    </label>
-                  </div>
-                ))}
+                {allClasses
+                  .filter((cls) =>
+                    (selectedTest.classNames || []).includes(cls.className || cls.name)
+                  )
+                  .sort((a, b) =>
+                    (a.className || a.name || "").localeCompare(b.className || b.name || "")
+                  )
+                  .map((cls) => (
+                    <div key={cls.id} className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        value={cls.id}
+                        checked={selectedClassesToPublish.includes(cls.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setSelectedClassesToPublish((prev) => {
+                            const updated = isChecked
+                              ? [...prev, cls.id]
+                              : prev.filter((id) => id !== cls.id);
+                            setPublishChanged(
+                              JSON.stringify(updated.sort()) !==
+                              JSON.stringify((selectedTest.publishedTo || []).sort())
+                            );
+                            return updated;
+                          });
+                        }}
+                      />
+                      <label className="form-check-label">
+                        {cls.className || cls.name || "Unnamed Class"}
+                      </label>
+                    </div>
+                  ))}
                 {publishChanged && (
                   <div className="alert alert-info mt-3 text-center">
                     Publishing status has changed. Click Confirm to save.

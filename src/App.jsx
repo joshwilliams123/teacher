@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import AuthRoute from "./AuthRoute";
 import TeacherHome from "./TeacherHome";
@@ -34,17 +34,16 @@ function App() {
     <div className="d-flex">
       {user && <Sidebar />}
       <div className="flex-grow-1 p-4">
-        <Routes>
+         <Routes>
           {!user ? (
             <>
               <Route path="/" element={<AuthRoute />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/login" element={<Login />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
             </>
           ) : (
             <>
-              <Route path="/" element={<Navigate to="/teacher-home" replace />} />
+              <Route path="/" element={<TeacherHome />} />
               <Route path="/teacher-home" element={<TeacherHome />} />
               <Route path="/teacher-choice" element={<TeacherChoice />} />
               <Route path="/create-item" element={<CreateItem />} />
@@ -56,7 +55,6 @@ function App() {
               <Route path="/edit-test/:testId" element={<EditTest />} />
               <Route path="/add-classes" element={<AddClasses />} />
               <Route path="/published-tests" element={<PublishedTests />} />
-              <Route path="*" element={<Navigate to="/teacher-home" replace />} />
             </>
           )}
         </Routes>
