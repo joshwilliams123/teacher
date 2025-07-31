@@ -19,6 +19,7 @@ function EditItem() {
         correctAnswer: "a",
         imageUrl: ""
     });
+    const [inputMode, setInputMode] = useState("latex"); 
     const auth = getAuth();
 
     useEffect(() => {
@@ -53,19 +54,6 @@ function EditItem() {
         setItem(prevItem => ({ ...prevItem, choices: newChoices }));
     };
 
-    const handleImageUpload = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-
-        reader.onload = () => {
-            const base64String = reader.result;
-            setItem(prevItem => ({ ...prevItem, imageUrl: base64String }));
-        };
-    };
-
     const handleAddOption = () => {
         setItem(prevItem => ({
             ...prevItem,
@@ -93,6 +81,25 @@ function EditItem() {
         }));
     };
 
+    const convertTextToLatex = (text) => {
+        if (!text.trim()) return text;
+        if (text.includes("\\text{")) return text;
+
+        const tokens = text.split(/\s+/);
+        return tokens
+            .map(token => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`))
+            .join(" \\ ");
+    };
+
+    const convertQuestionToLatex = () => {
+        handleInputChange("text", convertTextToLatex(item.text));
+    };
+
+    const convertChoiceToLatex = (index) => {
+        const converted = convertTextToLatex(item.choices[index]);
+        handleChoiceChange(index, converted);
+    };
+
     const handleSaveItem = async (e) => {
         e.preventDefault();
         const currentUser = auth.currentUser;
@@ -100,9 +107,16 @@ function EditItem() {
             console.error("No user is logged in");
             return;
         }
+
+        let finalItem = { ...item };
+        if (inputMode === "regular") {
+            finalItem.text = convertTextToLatex(item.text);
+            finalItem.choices = item.choices.map(choice => convertTextToLatex(choice));
+        }
+
         try {
             const itemRef = doc(db, "items", itemId);
-            await updateDoc(itemRef, { ...item, userId: currentUser.uid });
+            await updateDoc(itemRef, { ...finalItem, userId: currentUser.uid });
             setSuccessMessage(true);
             setTimeout(() => navigate("/view-items"), 2000);
         } catch (error) {
@@ -133,6 +147,43 @@ function EditItem() {
                             onChange={(e) => handleInputChange("title", e.target.value)}
                         />
                     </div>
+
+                    <div className="mb-3">
+                        <label className="me-3">Input Mode:</label>
+                        <div className="form-check form-check-inline">
+                            <input
+                                className="form-check-input"
+                                type="radio"
+                                name="inputMode"
+                                id="regularMode"
+                                value="regular"
+                                checked={inputMode === "regular"}
+                                onChange={() => setInputMode("regular")}
+                            />
+                            <label className="form-check-label" htmlFor="regularMode">
+                                Regular
+                            </label>
+                        </div>
+                        <div className="form-check form-check-inline">
+                            <input
+                                className="form-check-input"
+                                type="radio"
+                                name="inputMode"
+                                id="latexMode"
+                                value="latex"
+                                checked={inputMode === "latex"}
+                                onChange={() => setInputMode("latex")}
+                            />
+                            <label className="form-check-label" htmlFor="latexMode">
+                                LaTeX
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="alert alert-info py-2 mb-3">
+                        <strong>Note:</strong> If you are using regular text, format to LaTeX prior to saving your item.
+                    </div>
+
                     <div className="form-group mb-4">
                         <label>Question Text</label>
                         <textarea
@@ -140,20 +191,23 @@ function EditItem() {
                             rows="5"
                             value={item.text}
                             onChange={(e) => handleInputChange("text", e.target.value)}
+                            placeholder={inputMode === "regular" ? "Enter plain text" : "Enter LaTeX"}
                         />
-                        <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
+                        {inputMode === "regular" && (
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm mt-2"
+                                onClick={convertQuestionToLatex}
+                            >
+                                Convert Question to LaTeX
+                            </button>
+                        )}
+                        <div className="mt-3 p-3 border bg-light">
+                            <strong>Preview:</strong>
                             <BlockMath>{item.text}</BlockMath>
                         </div>
                     </div>
-                    <div className="mb-3">
-                        <label>Upload Question Image:</label>
-                        <input type="file" className="form-control" accept="image/*" onChange={handleImageUpload} />
-                        {item.imageUrl && (
-                            <div className="mt-2">
-                                <img src={item.imageUrl} alt="Question" className="img-fluid" style={{ maxHeight: "200px" }} />
-                            </div>
-                        )}
-                    </div>
+
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
                             <li key={index} className="list-group-item position-relative border rounded mb-3" style={getChoiceStyle(index)}>
@@ -163,7 +217,6 @@ function EditItem() {
                                         className="btn btn-danger btn-sm position-absolute"
                                         style={{ top: "5px", right: "5px", zIndex: 1 }}
                                         onClick={() => handleDeleteOption(index)}
-                                        aria-label={`Delete choice ${String.fromCharCode(97 + index)}`}
                                     >
                                         &times;
                                     </button>
@@ -174,18 +227,21 @@ function EditItem() {
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-                                <div className="mt-2 p-2 border" style={{
-                                    overflowX: "auto",
-                                    wordWrap: "break-word",
-                                    maxWidth: "100%",
-                                    whiteSpace: "normal"
-                                }}>
+                                {inputMode === "regular" && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary btn-sm mb-2"
+                                        onClick={() => convertChoiceToLatex(index)}
+                                    >
+                                        Convert to LaTeX
+                                    </button>
+                                )}
+                                <div className="mt-2 p-2 border bg-light">
                                     <InlineMath>{choice}</InlineMath>
                                 </div>
                             </li>
                         ))}
                     </ol>
-
 
                     <button type="button" className="btn btn-primary btn-sm mt-3" onClick={handleAddOption}>
                         Add Option

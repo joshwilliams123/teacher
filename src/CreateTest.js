@@ -16,8 +16,10 @@ function CreateTest() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [classError, setClassError] = useState(false);
+  const [testNameError, setTestNameError] = useState(false);
   const dropdownRef = useRef(null);
   const classErrorRef = useRef(null);
+  const testNameErrorRef = useRef(null);
 
   const auth = getAuth();
   const navigate = useNavigate();
@@ -59,17 +61,25 @@ function CreateTest() {
     if (classError && classErrorRef.current) {
       classErrorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [classError]);
+    if (testNameError && testNameErrorRef.current) {
+      testNameErrorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [classError, testNameError]);
 
   const handleSaveTest = async (e) => {
     e.preventDefault();
     setClassError(false);
+    setTestNameError(false);
     const currentUser = auth.currentUser;
 
     if (!currentUser) return;
 
     if (className.length === 0) {
       setClassError(true);
+      return;
+    }
+    if (!testName.trim()) {
+      setTestNameError(true);
       return;
     }
 
@@ -167,7 +177,13 @@ function CreateTest() {
               className="form-control"
               value={testName}
               onChange={(e) => setTestName(e.target.value)}
+              ref={testNameErrorRef}
             />
+            {testNameError && (
+              <div className="text-danger mt-2">
+                Test name is required.
+              </div>
+            )}
           </div>
 
           <div className="mb-4">

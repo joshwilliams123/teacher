@@ -1,22 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from './firebase';
-import { useParams } from "react-router-dom";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 function EditTest() {
     const { testId } = useParams();
     const [successMessage, setSuccessMessage] = useState(false);
     const [testName, setTestName] = useState("");
     const [questions, setQuestions] = useState([]);
-    const [imageUploadProgress, setImageUploadProgress] = useState({});
-
+    const [inputModes, setInputModes] = useState({});
     const auth = getAuth();
     const navigate = useNavigate();
 
@@ -29,6 +26,9 @@ function EditTest() {
                     const data = testSnap.data();
                     setTestName(data.testName);
                     setQuestions(data.questions);
+                    const modes = {};
+                    data.questions.forEach((_, i) => { modes[i] = "latex"; });
+                    setInputModes(modes);
                 }
             } catch (error) {
                 console.error("Error fetching test: ", error);
@@ -37,101 +37,102 @@ function EditTest() {
         fetchTest();
     }, [testId]);
 
-    const handleSaveTest = async (e) => {
-        e.preventDefault();
-        const currentUser = auth.currentUser;
+    const convertTextToLatex = (text) => {
+        if (!text.trim()) return text;
+        if (text.includes("\\text{")) return text;
 
-        if (!currentUser) {
-            console.error("No user is logged in");
-            return;
-        }
-
-        try {
-            const testRef = doc(db, "tests", testId);
-            await updateDoc(testRef, {
-                testName,
-                questions,
-                userId: currentUser.uid,
-            });
-            setSuccessMessage(true);
-            setTimeout(() => setSuccessMessage(false), 3000);
-            navigate("/test-viewer");
-        } catch (error) {
-            console.error("Error updating test: ", error);
-        }
+        const tokens = text.split(/\s+/);
+        return tokens
+            .map(token => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`))
+            .join(" \\ ");
     };
 
-    const handleInputChange = (questionIndex, field, value) => {
+    const handleInputChange = (qIndex, field, value) => {
         const newQuestions = [...questions];
-        newQuestions[questionIndex][field] = value;
+        newQuestions[qIndex][field] = value;
         setQuestions(newQuestions);
     };
 
-    const handleChoiceChange = (questionIndex, choiceIndex, value) => {
+    const handleChoiceChange = (qIndex, cIndex, value) => {
         const newQuestions = [...questions];
-        newQuestions[questionIndex].choices[choiceIndex] = value;
+        newQuestions[qIndex].choices[cIndex] = value;
         setQuestions(newQuestions);
     };
 
-    const getChoiceStyle = (questionIndex, choiceIndex) => {
-        return questions[questionIndex].correctAnswer === String.fromCharCode(97 + choiceIndex)
-            ? { backgroundColor: "lightgreen" }
-            : {};
+    const handleConvertQuestionToLatex = (qIndex) => {
+        const converted = convertTextToLatex(questions[qIndex].text);
+        handleInputChange(qIndex, "text", converted);
+    };
+
+    const handleConvertChoiceToLatex = (qIndex, cIndex) => {
+        const converted = convertTextToLatex(questions[qIndex].choices[cIndex]);
+        handleChoiceChange(qIndex, cIndex, converted);
     };
 
     const handleAddQuestion = () => {
         const newQuestion = {
             id: questions.length + 1,
             title: "",
-            text: "Enter question text here.",
+            text: "",
             choices: ["", ""],
-            correctAnswer: "a",
-            imageUrl: "",
+            correctAnswer: "a"
         };
         setQuestions([...questions, newQuestion]);
+        setInputModes(prev => ({ ...prev, [questions.length]: "regular" }));
     };
 
-    const handleAddOption = (questionIndex) => {
+    const handleAddOption = (qIndex) => {
         const newQuestions = [...questions];
-        newQuestions[questionIndex].choices.push("");
+        newQuestions[qIndex].choices.push("");
         setQuestions(newQuestions);
     };
 
-    const handleFileUpload = async (questionIndex, e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    const handleDeleteQuestion = (qIndex) => {
+        const newQuestions = [...questions];
+        newQuestions.splice(qIndex, 1);
+        setQuestions(newQuestions);
+    };
 
-        const storage = getStorage();
-        const storagePath = `test-images/${testId}/${file.name}`;
-        const imageRef = storageRef(storage, storagePath);
+    const getChoiceStyle = (qIndex, cIndex) => {
+        return questions[qIndex].correctAnswer === String.fromCharCode(97 + cIndex)
+            ? { backgroundColor: "lightgreen" }
+            : {};
+    };
 
-        const uploadTask = uploadBytesResumable(imageRef, file);
+    const handleSaveTest = async (e) => {
+        e.preventDefault();
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            console.error("No user is logged in");
+            return;
+        }
 
-        uploadTask.on(
-            "state_changed",
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setImageUploadProgress((prevProgress) => ({
-                    ...prevProgress,
-                    [questionIndex]: progress,
-                }));
-            },
-            (error) => {
-                console.error("Error uploading image:", error);
-            },
-            async () => {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                const newQuestions = [...questions];
-                newQuestions[questionIndex].imageUrl = downloadURL;
-                setQuestions(newQuestions);
+        const finalQuestions = questions.map((q, qIndex) => {
+            if (inputModes[qIndex] === "regular") {
+                return {
+                    ...q,
+                    text: convertTextToLatex(q.text),
+                    choices: q.choices.map(choice => convertTextToLatex(choice))
+                };
             }
-        );
-    };
+            return q;
+        });
 
-    const handleDeleteQuestion = (questionIndex) => {
-        const newQuestions = [...questions];
-        newQuestions.splice(questionIndex, 1);
-        setQuestions(newQuestions);
+        try {
+            const testRef = doc(db, "tests", testId);
+            await updateDoc(testRef, {
+                testName,
+                questions: finalQuestions,
+                userId: currentUser.uid
+            });
+            setSuccessMessage(true);
+            setTimeout(() => {
+                setSuccessMessage(false);
+                navigate("/test-viewer");
+            }, 2000);
+        } catch (error) {
+            console.error("Error updating test: ", error);
+        }
     };
 
     return (
@@ -152,78 +153,103 @@ function EditTest() {
                         />
                     </div>
 
-                    {questions.map((question, questionIndex) => (
-                        <div key={question.id} className="form-group mb-4">
+                    {questions.map((question, qIndex) => (
+                        <div key={qIndex} className="form-group mb-4">
                             <div className="card">
-                                <div className="card-body">
-                                <button
+                                <div className="card-body position-relative">
+                                    <button
                                         type="button"
                                         className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
-                                        onClick={() => handleDeleteQuestion(questionIndex)}
+                                        onClick={() => handleDeleteQuestion(qIndex)}
                                     >
                                         X
                                     </button>
-                                    <h3 className="card-title">{questionIndex + 1}.</h3>
+
+                                    <h3 className="card-title">{qIndex + 1}.</h3>
+
                                     <input
                                         className="form-control mb-3"
                                         placeholder="Question Title (optional)"
                                         value={question.title}
-                                        onChange={(e) => handleInputChange(questionIndex, 'title', e.target.value)}
+                                        onChange={(e) => handleInputChange(qIndex, 'title', e.target.value)}
                                     />
 
-                                    <textarea
-                                        className="form-control mb-3"
-                                        rows="5"
-                                        value={question.text}
-                                        onChange={(e) => handleInputChange(questionIndex, 'text', e.target.value)}
-                                    />
-
-                                    <div className="mb-3">
-                                        <label>Question Image</label>
-                                        <input
-                                            type="file"
-                                            className="form-control"
-                                            onChange={(e) => handleFileUpload(questionIndex, e)}
-                                        />
-                                        {imageUploadProgress[questionIndex] && (
-                                            <div className="progress mt-2">
-                                                <div
-                                                    className="progress-bar"
-                                                    role="progressbar"
-                                                    style={{ width: `${imageUploadProgress[questionIndex]}%` }}
-                                                    aria-valuenow={imageUploadProgress[questionIndex]}
-                                                    aria-valuemin="0"
-                                                    aria-valuemax="100"
-                                                >
-                                                    {Math.round(imageUploadProgress[questionIndex])}%
-                                                </div>
-                                            </div>
-                                        )}
-                                        {question.imageUrl && <img src={question.imageUrl} alt="Question" className="mt-2" style={{ width: "100%", maxHeight: "300px", objectFit: "contain" }} />}
+                                    <div className="mb-2">
+                                        <label className="me-3">Input Mode:</label>
+                                        <div className="form-check form-check-inline">
+                                            <input
+                                                className="form-check-input"
+                                                type="radio"
+                                                name={`inputMode-${qIndex}`}
+                                                value="regular"
+                                                checked={inputModes[qIndex] === "regular"}
+                                                onChange={() => setInputModes(prev => ({ ...prev, [qIndex]: "regular" }))}
+                                            />
+                                            <label className="form-check-label">Regular</label>
+                                        </div>
+                                        <div className="form-check form-check-inline">
+                                            <input
+                                                className="form-check-input"
+                                                type="radio"
+                                                name={`inputMode-${qIndex}`}
+                                                value="latex"
+                                                checked={inputModes[qIndex] === "latex"}
+                                                onChange={() => setInputModes(prev => ({ ...prev, [qIndex]: "latex" }))}
+                                            />
+                                            <label className="form-check-label">LaTeX</label>
+                                        </div>
                                     </div>
 
-                                    <div className="mt-2 p-2 border" style={{ overflowX: "auto", wordWrap: "break-word", maxWidth: "100%", whiteSpace: "normal" }}>
+                                    <div className="alert alert-info py-2">
+                                        <strong>Note:</strong> If you are using regular text, format to LaTeX prior to saving your test.
+                                    </div>
+
+                                    <textarea
+                                        className="form-control mb-2"
+                                        rows="4"
+                                        value={question.text}
+                                        onChange={(e) => handleInputChange(qIndex, 'text', e.target.value)}
+                                        placeholder={inputModes[qIndex] === "regular" ? "Enter plain text" : "Enter LaTeX"}
+                                    />
+                                    {inputModes[qIndex] === "regular" && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm mb-3"
+                                            onClick={() => handleConvertQuestionToLatex(qIndex)}
+                                        >
+                                            Convert Question to LaTeX
+                                        </button>
+                                    )}
+
+                                    <div className="mt-2 p-2 border bg-light"
+                                        style={{ maxHeight: "auto", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
                                         <BlockMath>{question.text}</BlockMath>
                                     </div>
 
-                                    <ol type="a" className="list-group">
-                                        {question.choices.map((choice, choiceIndex) => (
-                                            <li key={choiceIndex} className="list-group-item border-0">
+
+                                    <ol type="a" className="list-group mt-3">
+                                        {question.choices.map((choice, cIndex) => (
+                                            <li key={cIndex} className="list-group-item border-0" style={getChoiceStyle(qIndex, cIndex)}>
                                                 <input
                                                     className="form-control mb-2"
-                                                    placeholder={`Answer Choice ${choiceIndex + 1}`}
+                                                    placeholder={`Answer Choice ${cIndex + 1}`}
                                                     value={choice}
-                                                    onChange={(e) => handleChoiceChange(questionIndex, choiceIndex, e.target.value)}
-                                                    style={getChoiceStyle(questionIndex, choiceIndex)}
+                                                    onChange={(e) => handleChoiceChange(qIndex, cIndex, e.target.value)}
                                                 />
-                                                <div className="mt-2 p-2 border" style={{
-                                                    overflowX: "auto",
-                                                    wordWrap: "break-word",
-                                                    maxWidth: "100%",
-                                                    whiteSpace: "normal"
-                                                }}>
+                                                {inputModes[qIndex] === "regular" && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-secondary btn-sm mb-2"
+                                                        onClick={() => handleConvertChoiceToLatex(qIndex, cIndex)}
+                                                    >
+                                                        Convert to LaTeX
+                                                    </button>
+                                                )}
+                                                <div className="mt-2 p-2 border bg-light"
+                                                    style={{ maxHeight: "auto", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
                                                     <InlineMath>{choice}</InlineMath>
                                                 </div>
+
                                             </li>
                                         ))}
                                     </ol>
@@ -231,7 +257,7 @@ function EditTest() {
                                     <button
                                         type="button"
                                         className="btn btn-primary btn-sm mt-3"
-                                        onClick={() => handleAddOption(questionIndex)}
+                                        onClick={() => handleAddOption(qIndex)}
                                     >
                                         Add Option
                                     </button>
@@ -240,7 +266,7 @@ function EditTest() {
                                     <select
                                         className="form-select"
                                         value={question.correctAnswer}
-                                        onChange={(e) => handleInputChange(questionIndex, 'correctAnswer', e.target.value)}
+                                        onChange={(e) => handleInputChange(qIndex, 'correctAnswer', e.target.value)}
                                     >
                                         {question.choices.map((_, index) => (
                                             <option key={index} value={String.fromCharCode(97 + index)}>
@@ -257,7 +283,7 @@ function EditTest() {
                         <button type="button" className="btn btn-primary btn-lg me-2" onClick={handleAddQuestion}>
                             Add Question
                         </button>
-                        <button type="submit" className="btn btn-primary btn-lg">
+                        <button type="submit" className="btn btn-success btn-lg">
                             Save Changes
                         </button>
                     </div>
@@ -265,10 +291,8 @@ function EditTest() {
             </main>
 
             {successMessage && (
-                <div className="alert alert-success fixed-bottom m-3" style={{ zIndex: 9999 }}>
-                    <p className="text-center mb-0">
-                        Your test was updated successfully!
-                    </p>
+                <div className="alert alert-success fixed-bottom m-3 text-center">
+                    Your test was updated successfully!
                 </div>
             )}
         </div>
