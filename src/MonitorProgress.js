@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, collection, getDocs, query, where } from "./firebase";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
+import 'katex/dist/katex.min.css';
+import { InlineMath } from 'react-katex';
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 function MonitorProgress() {
   const [user, setUser] = useState(null);
@@ -11,6 +15,7 @@ function MonitorProgress() {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const modalBodyRef = useRef(null);
 
   useEffect(() => {
     const auth = getAuth();
@@ -64,6 +69,19 @@ function MonitorProgress() {
     return classObj ? (classObj.name || classObj.className || "Unnamed Class") : "Unknown Class";
   };
 
+  const handleDownloadPDF = async () => {
+    if (!modalBodyRef.current) return;
+    const canvas = await html2canvas(modalBodyRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: [canvas.width, canvas.height]
+    });
+    pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+    pdf.save("test-analytics.pdf");
+  };
+
   return (
     <div>
       <header>
@@ -95,7 +113,7 @@ function MonitorProgress() {
           <table className="table table-striped">
             <thead>
               <tr>
-                <th>Email</th>
+                <th>Student</th>
                 <th>Class</th>
                 <th>Test Taken</th>
                 <th>Score</th>
@@ -123,7 +141,7 @@ function MonitorProgress() {
                         className="btn btn-sm btn-info"
                         onClick={() => handleShowModal(student)}
                       >
-                        View Time Spent Per Question
+                        Test Analytics
                       </button>
                     </td>
                   </tr>
@@ -135,29 +153,79 @@ function MonitorProgress() {
       </main>
 
       {showModal && selectedStudent && (
-        <div className="modal show d-block" tabIndex="-1" role="dialog" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="modal-dialog" role="document">
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1050
+          }}
+        >
+          <div
+            className="modal-dialog modal-xl"
+            role="document"
+            style={{ maxWidth: "90vw" }}
+          >
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  Question Times for {selectedStudent.userEmail || selectedStudent.userId}
+                  Test Analytics for {selectedStudent.userEmail || selectedStudent.userId}
                 </h5>
                 <button type="button" className="btn-close" onClick={handleCloseModal}></button>
               </div>
-              <div className="modal-body">
-                {selectedStudent.questionTimes && selectedStudent.questionTimes.length > 0 ? (
-                  <ul>
-                    {selectedStudent.questionTimes.map((time, idx) => (
-                      <li key={idx}>
-                        Question {idx + 1}: {(time / 1000).toFixed(2)} seconds
-                      </li>
-                    ))}
-                  </ul>
+              <div className="modal-body" ref={modalBodyRef}>
+                {selectedStudent.answerDetails && selectedStudent.answerDetails.length > 0 ? (
+                  <div className="table-responsive">
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Question</th>
+                          <th>Time Spent (s)</th>
+                          <th>Student's Choice</th>
+                          <th>Correct Answer</th>
+                          <th>Correct?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedStudent.answerDetails.map((detail, idx) => (
+                          <tr key={idx}>
+                            <td>{detail.questionIndex + 1}</td>
+                            <td>
+                              {selectedStudent.questionTimes && selectedStudent.questionTimes[detail.questionIndex] !== undefined
+                                ? (selectedStudent.questionTimes[detail.questionIndex] / 1000).toFixed(2)
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.selectedText
+                                ? <InlineMath math={detail.selectedText} />
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.correctText
+                                ? <InlineMath math={detail.correctText} />
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.selectedIndex === detail.correctIndex ? (
+                                <span className="text-success">✔</span>
+                              ) : (
+                                <span className="text-danger">✘</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <p>No question time data available.</p>
+                  <p>No question analytics data available.</p>
                 )}
               </div>
               <div className="modal-footer">
+                <button className="btn btn-primary" onClick={handleDownloadPDF}>
+                  Download as PDF
+                </button>
                 <button className="btn btn-secondary" onClick={handleCloseModal}>Close</button>
               </div>
             </div>
