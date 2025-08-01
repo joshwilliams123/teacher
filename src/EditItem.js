@@ -38,7 +38,6 @@ function EditItem() {
                     });
                 }
             } catch (error) {
-                console.error("Error fetching item: ", error);
             }
         };
         fetchItem();
@@ -63,9 +62,7 @@ function EditItem() {
 
     const handleDeleteOption = (indexToRemove) => {
         if (item.choices.length <= 2) return;
-
         const newChoices = item.choices.filter((_, index) => index !== indexToRemove);
-
         let newCorrectAnswer = item.correctAnswer;
         const correctIndex = item.correctAnswer.charCodeAt(0) - 97;
         if (indexToRemove < correctIndex) {
@@ -73,7 +70,6 @@ function EditItem() {
         } else if (indexToRemove === correctIndex) {
             newCorrectAnswer = "a";
         }
-
         setItem(prevItem => ({
             ...prevItem,
             choices: newChoices,
@@ -84,7 +80,6 @@ function EditItem() {
     const convertTextToLatex = (text) => {
         if (!text.trim()) return text;
         if (text.includes("\\text{")) return text;
-
         const tokens = text.split(/\s+/);
         return tokens
             .map(token => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`))
@@ -104,23 +99,19 @@ function EditItem() {
         e.preventDefault();
         const currentUser = auth.currentUser;
         if (!currentUser) {
-            console.error("No user is logged in");
             return;
         }
-
         let finalItem = { ...item };
         if (inputMode === "regular") {
             finalItem.text = convertTextToLatex(item.text);
             finalItem.choices = item.choices.map(choice => convertTextToLatex(choice));
         }
-
         try {
             const itemRef = doc(db, "items", itemId);
             await updateDoc(itemRef, { ...finalItem, userId: currentUser.uid });
             setSuccessMessage(true);
             setTimeout(() => navigate("/view-items"), 2000);
         } catch (error) {
-            console.error("Error updating item: ", error);
         }
     };
 
@@ -147,7 +138,6 @@ function EditItem() {
                             onChange={(e) => handleInputChange("title", e.target.value)}
                         />
                     </div>
-
                     <div className="mb-3">
                         <label className="me-3">Input Mode:</label>
                         <div className="form-check form-check-inline">
@@ -179,11 +169,9 @@ function EditItem() {
                             </label>
                         </div>
                     </div>
-
                     <div className="alert alert-info py-2 mb-3">
                         <strong>Note:</strong> If you are using regular text, format to LaTeX prior to saving your item.
                     </div>
-
                     <div className="form-group mb-4">
                         <label>Question Text</label>
                         <textarea
@@ -207,7 +195,6 @@ function EditItem() {
                             <BlockMath>{item.text}</BlockMath>
                         </div>
                     </div>
-
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
                             <li key={index} className="list-group-item position-relative border rounded mb-3" style={getChoiceStyle(index)}>
@@ -242,11 +229,9 @@ function EditItem() {
                             </li>
                         ))}
                     </ol>
-
                     <button type="button" className="btn btn-primary btn-sm mt-3" onClick={handleAddOption}>
                         Add Option
                     </button>
-
                     <h6 className="mt-3">Correct Answer:</h6>
                     <select
                         className="form-select"
@@ -259,7 +244,6 @@ function EditItem() {
                             </option>
                         ))}
                     </select>
-
                     <div className="mb-4 mt-4">
                         <button type="submit" className="btn btn-primary btn-lg">Save Changes</button>
                     </div>

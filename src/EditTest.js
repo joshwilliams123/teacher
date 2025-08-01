@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from './firebase';
+import { addDoc, collection, db } from './firebase';
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
@@ -70,16 +70,16 @@ function EditTest() {
     };
 
     const handleAddQuestion = () => {
-        const newQuestion = {
-            id: questions.length + 1,
-            title: "",
-            text: "",
-            choices: ["", ""],
-            correctAnswer: "a"
-        };
-        setQuestions([...questions, newQuestion]);
-        setInputModes(prev => ({ ...prev, [questions.length]: "regular" }));
+    const newQuestion = {
+        title: "",
+        text: "",
+        choices: ["", ""],
+        correctAnswer: "a",
+        isNew: true 
     };
+    setQuestions([...questions, newQuestion]);
+    setInputModes(prev => ({ ...prev, [questions.length]: "regular" }));
+};
 
     const handleAddOption = (qIndex) => {
         const newQuestions = [...questions];
@@ -100,40 +100,54 @@ function EditTest() {
     };
 
     const handleSaveTest = async (e) => {
-        e.preventDefault();
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            console.error("No user is logged in");
-            return;
-        }
+    e.preventDefault();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        console.error("No user is logged in");
+        return;
+    }
 
-        const finalQuestions = questions.map((q, qIndex) => {
-            if (inputModes[qIndex] === "regular") {
-                return {
-                    ...q,
-                    text: convertTextToLatex(q.text),
-                    choices: q.choices.map(choice => convertTextToLatex(choice))
-                };
+    const finalQuestions = questions.map((q, qIndex) => {
+        if (inputModes[qIndex] === "regular") {
+            return {
+                ...q,
+                text: convertTextToLatex(q.text),
+                choices: q.choices.map(choice => convertTextToLatex(choice))
+            };
+        }
+        return q;
+    });
+
+    const newQuestions = finalQuestions.filter(q => q.isNew);
+
+    try {
+        for (const q of newQuestions) {
+            if (q.text.trim() && q.choices.filter(c => c.trim()).length >= 2) {
+                const { isNew, ...itemData } = q; 
+                await addDoc(collection(db, "items"), {
+                    ...itemData,
+                    userId: currentUser.uid,
+                    createdAt: new Date()
+                });
             }
-            return q;
-        });
-
-        try {
-            const testRef = doc(db, "tests", testId);
-            await updateDoc(testRef, {
-                testName,
-                questions: finalQuestions,
-                userId: currentUser.uid
-            });
-            setSuccessMessage(true);
-            setTimeout(() => {
-                setSuccessMessage(false);
-                navigate("/test-viewer");
-            }, 2000);
-        } catch (error) {
-            console.error("Error updating test: ", error);
         }
-    };
+        const cleanedQuestions = finalQuestions.map(({ isNew, ...rest }) => rest);
+
+        const testRef = doc(db, "tests", testId);
+        await updateDoc(testRef, {
+            testName,
+            questions: cleanedQuestions,
+            userId: currentUser.uid
+        });
+        setSuccessMessage(true);
+        setTimeout(() => {
+            setSuccessMessage(false);
+            navigate("/test-viewer");
+        }, 2000);
+    } catch (error) {
+        console.error("Error updating test: ", error);
+    }
+};
 
     return (
         <div className="container-fluid">
