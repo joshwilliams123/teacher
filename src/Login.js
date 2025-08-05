@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 import { auth, googleProvider, signInWithPopup } from "./firebase";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -9,15 +12,17 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/teacher-home"); 
+      navigate("/teacher-home");
     } catch (err) {
       if (err.code === "auth/invalid-credential") {
         setError("Invalid email or password.");
@@ -29,6 +34,7 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     setError("");
+    setSuccess("");
     try {
       await signInWithPopup(auth, googleProvider);
       navigate("/teacher-home");
@@ -39,13 +45,18 @@ const Login = () => {
 
   const handleForgotPassword = async () => {
     setError("");
+    setSuccess("");
     if (!email) {
       setError("Please enter your email to reset your password.");
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
-      alert("A password reset email has been sent to your inbox.");
+      await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/login`, 
+      });
+      setSuccess(
+        `A password reset email has been sent to ${email}. Please check your inbox and return to the login page.`
+      );
     } catch (err) {
       setError(err.message);
     }
@@ -65,11 +76,13 @@ const Login = () => {
           <div className="text-center mb-4">
             <h2>Log Into Your Account</h2>
           </div>
+
           {error && <p className="text-danger text-center">{error}</p>}
+          {success && <p className="text-success text-center">{success}</p>}
+
           <div className="w-50 mx-auto">
             <form onSubmit={handleLogin}>
-              <div className="mb-3">
-                <label className="form-label">Email</label>
+              <div className="mb-3 d-flex align-items-center gap-2">
                 <input
                   type="email"
                   className="form-control"
@@ -78,9 +91,17 @@ const Login = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  className="btn btn-outline-danger"
+                  onClick={handleForgotPassword}
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  Forgot Password?
+                </button>
               </div>
-              <div className="mb-3">
-                <label className="form-label">Password</label>
+
+              <div className="mb-1">
                 <input
                   type="password"
                   className="form-control"
@@ -90,7 +111,8 @@ const Login = () => {
                   required
                 />
               </div>
-              <div className="d-flex justify-content-center gap-3 mt-3">
+
+              <div className="d-flex justify-content-center gap-3 mt-4">
                 <button
                   type="submit"
                   className="btn btn-primary flex-fill"
@@ -106,7 +128,7 @@ const Login = () => {
                     color: "#000",
                     border: "1px solid #ccc",
                     gap: "8px",
-                    maxWidth: "220px"
+                    maxWidth: "220px",
                   }}
                   onClick={handleGoogleLogin}
                 >
@@ -116,20 +138,6 @@ const Login = () => {
                     style={{ width: "24px", height: "24px" }}
                   />
                   Log In With Google
-                </button>
-              </div>
-              <div className="mt-4 mb-2 text-center">
-                <small className="text-muted">
-                  Forgot your password? Enter your email above and click below to receive a reset link.
-                </small>
-              </div>
-              <div className="text-center">
-                <button
-                  type="button"
-                  className="btn btn-outline-danger"
-                  onClick={handleForgotPassword}
-                >
-                  Forgot Password?
                 </button>
               </div>
             </form>
