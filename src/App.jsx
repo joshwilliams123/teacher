@@ -15,26 +15,41 @@ import Signup from "./Signup";
 import Login from "./Login";
 import AddClasses from "./AddClasses";
 import PublishedTests from "./PublishedTests";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const auth = getAuth();
+  const INACTIVITY_LIMIT = 12 * 60 * 60 * 1000; 
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        const lastVisit = localStorage.getItem("lastVisit");
+        const now = Date.now();
+
+        if (lastVisit && now - parseInt(lastVisit, 10) > INACTIVITY_LIMIT) {
+          await signOut(auth);
+          setUser(null);
+          localStorage.removeItem("lastVisit");
+        } else {
+          setUser(currentUser);
+          localStorage.setItem("lastVisit", now.toString());
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem("lastVisit");
+      }
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, []);
 
-  if (loading) {
-    return null; 
-  }
+    return () => unsubscribe();
+  }, [auth]);
+
+  if (loading) return null;
 
   return (
     <div className="d-flex">
