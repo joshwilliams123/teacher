@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import AuthRoute from "./AuthRoute";
 import TeacherHome from "./TeacherHome";
@@ -21,42 +21,85 @@ import "./css/styles.css";
 
 function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
+
+  if (loading) {
+    return null; 
+  }
 
   return (
     <div className="d-flex">
       {user && <Sidebar />}
       <div className="flex-grow-1 p-4">
-         <Routes>
-          {!user ? (
-            <>
-              <Route path="/" element={<AuthRoute />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/login" element={<Login />} />
-            </>
-          ) : (
-            <>
-              <Route path="/" element={<TeacherHome />} />
-              <Route path="/teacher-home" element={<TeacherHome />} />
-              <Route path="/teacher-choice" element={<TeacherChoice />} />
-              <Route path="/create-item" element={<CreateItem />} />
-              <Route path="/create-test" element={<CreateTest />} />
-              <Route path="/view-items" element={<ViewItems />} />
-              <Route path="/monitor-progress" element={<MonitorProgress />} />
-              <Route path="/test-viewer" element={<TestViewer />} />
-              <Route path="/edit-item/:itemId" element={<EditItem />} />
-              <Route path="/edit-test/:testId" element={<EditTest />} />
-              <Route path="/add-classes" element={<AddClasses />} />
-              <Route path="/published-tests" element={<PublishedTests />} />
-            </>
-          )}
+        <Routes>
+          <Route
+            path="/"
+            element={user ? <Navigate to="/teacher-home" replace /> : <AuthRoute />}
+          />
+          <Route
+            path="/signup"
+            element={user ? <Navigate to="/teacher-home" replace /> : <Signup />}
+          />
+          <Route
+            path="/login"
+            element={user ? <Navigate to="/teacher-home" replace /> : <Login />}
+          />
+
+          <Route
+            path="/teacher-home"
+            element={user ? <TeacherHome /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/teacher-choice"
+            element={user ? <TeacherChoice /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/create-item"
+            element={user ? <CreateItem /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/create-test"
+            element={user ? <CreateTest /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/view-items"
+            element={user ? <ViewItems /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/monitor-progress"
+            element={user ? <MonitorProgress /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/test-viewer"
+            element={user ? <TestViewer /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/edit-item/:itemId"
+            element={user ? <EditItem /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/edit-test/:testId"
+            element={user ? <EditTest /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/add-classes"
+            element={user ? <AddClasses /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/published-tests"
+            element={user ? <PublishedTests /> : <Navigate to="/" replace />}
+          />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </div>

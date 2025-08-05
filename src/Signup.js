@@ -9,20 +9,15 @@ const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccessMessage("");
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      setSuccessMessage("Your account was created successfully! You will now be redirected to teacher home page!");
-      setEmail("");
-      setPassword("");
-      setTimeout(() => navigate("/teacher-home"), 2500);
+      navigate("/teacher-home"); 
     } catch (err) {
       if (err.code === "auth/weak-password") {
         setError("The password should be at least 6 letters");
@@ -34,11 +29,9 @@ const Signup = () => {
 
   const handleGoogleSignup = async () => {
     setError("");
-    setSuccessMessage("");
     try {
       await signInWithPopup(auth, googleProvider);
-      setSuccessMessage("Signed up with Google! Redirecting to teacher home page...");
-      setTimeout(() => navigate("/teacher-home"), 2000);
+      navigate("/teacher-home"); 
     } catch (err) {
       setError(err.message);
     }
@@ -115,11 +108,6 @@ const Signup = () => {
           </div>
         </div>
       </main>
-      {successMessage && (
-        <div className="alert alert-success fixed-bottom m-3" style={{ zIndex: 9999 }}>
-          <p className="text-center mb-0">{successMessage}</p>
-        </div>
-      )}
     </div>
   );
 };

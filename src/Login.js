@@ -9,23 +9,15 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccessMessage("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setSuccessMessage("You have successfully logged in! You will be redirected to the teacher home page.");
-      setEmail("");
-      setPassword("");
-      setTimeout(() => {
-        setSuccessMessage("");
-        navigate("/teacher-home");
-      }, 2500);
+      navigate("/teacher-home"); 
     } catch (err) {
       if (err.code === "auth/invalid-credential") {
         setError("Invalid email or password.");
@@ -37,14 +29,9 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     setError("");
-    setSuccessMessage("");
     try {
       await signInWithPopup(auth, googleProvider);
-      setSuccessMessage("Logged in with Google! Redirecting to teacher home page...");
-      setTimeout(() => {
-        setSuccessMessage("");
-        navigate("/teacher-home");
-      }, 2000);
+      navigate("/teacher-home");
     } catch (err) {
       setError(err.message);
     }
@@ -52,15 +39,13 @@ const Login = () => {
 
   const handleForgotPassword = async () => {
     setError("");
-    setSuccessMessage("");
     if (!email) {
       setError("Please enter your email to reset your password.");
       return;
     }
     try {
       await sendPasswordResetEmail(auth, email);
-      setSuccessMessage("A password reset email has been sent to your inbox.");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      alert("A password reset email has been sent to your inbox.");
     } catch (err) {
       setError(err.message);
     }
@@ -151,11 +136,6 @@ const Login = () => {
           </div>
         </div>
       </main>
-      {successMessage && (
-        <div className="alert alert-success fixed-bottom m-3" style={{ zIndex: 9999 }}>
-          <p className="text-center mb-0">{successMessage}</p>
-        </div>
-      )}
     </div>
   );
 };
