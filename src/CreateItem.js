@@ -65,15 +65,21 @@ function CreateItem() {
         let finalItem = { ...item };
 
         if (inputMode === "regular") {
-            finalItem.text = convertTextToLatex(item.text);
+            finalItem.originalText = item.text;
+            finalItem.originalChoices = [...item.choices];
 
+            finalItem.text = convertTextToLatex(item.text);
             finalItem.choices = item.choices.map(choice => convertTextToLatex(choice));
+        } else {
+            finalItem.originalText = item.text;
+            finalItem.originalChoices = [...item.choices];
         }
 
         try {
             await addDoc(collection(db, "items"), {
                 ...finalItem,
                 userId: user.uid,
+                inputMode: inputMode,
                 createdAt: new Date()
             });
             setSuccessMessage(true);
@@ -91,24 +97,11 @@ function CreateItem() {
 
     const convertTextToLatex = (text) => {
         if (!text.trim()) return text;
-
         if (text.includes("\\text{")) return text;
-
         const tokens = text.split(/\s+/); 
         return tokens
-            .map(token => {
-                return /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`;
-            })
+            .map(token => /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)
             .join(" \\ "); 
-    };
-
-    const convertQuestionToLatex = () => {
-        handleInputChange("text", convertTextToLatex(item.text));
-    };
-
-    const convertChoiceToLatex = (index) => {
-        const convertedChoice = convertTextToLatex(item.choices[index]);
-        handleChoiceChange(index, convertedChoice);
     };
 
     return (
@@ -163,9 +156,11 @@ function CreateItem() {
                         </div>
                     </div>
 
-                    <div className="alert alert-info py-2 mb-3">
-                        <strong>Note:</strong> If you are using regular text, format everything to LaTeX prior to saving your item.
-                    </div>
+                    {inputMode === "latex" && (
+                        <div className="alert alert-info py-2 mb-3">
+                            <strong>Note:</strong> Enter your question and choices using proper LaTeX syntax.
+                        </div>
+                    )}
 
                     <div className="form-group mb-4">
                         <label>Question Text</label>
@@ -176,22 +171,13 @@ function CreateItem() {
                             onChange={(e) => handleInputChange("text", e.target.value)}
                             placeholder={inputMode === "regular" ? "Enter question in plain text" : "Enter LaTeX formatted question"}
                         />
-                        {inputMode === "regular" && (
-                            <button
-                                type="button"
-                                className="btn btn-secondary btn-sm mt-2"
-                                onClick={convertQuestionToLatex}
-                            >
-                                Convert Question to LaTeX
-                            </button>
-                        )}
 
-                        <div className="mt-3 p-3 border bg-light">
-                            <strong>Preview:</strong>
-                            <div style={{ overflowX: "auto", whiteSpace: "normal" }}>
+                        {inputMode === "latex" && (
+                            <div className="mt-3 p-3 border bg-light">
+                                <strong>Preview:</strong>
                                 <BlockMath>{item.text}</BlockMath>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     <ol type="a" className="list-group">
@@ -210,18 +196,12 @@ function CreateItem() {
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-                                {inputMode === "regular" && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-secondary btn-sm mb-2"
-                                        onClick={() => convertChoiceToLatex(index)}
-                                    >
-                                        Convert to LaTeX
-                                    </button>
+
+                                {inputMode === "latex" && (
+                                    <div className="mt-2 p-2 border bg-light">
+                                        <InlineMath>{choice}</InlineMath>
+                                    </div>
                                 )}
-                                <div className="mt-2 p-2 border bg-light">
-                                    <InlineMath>{choice}</InlineMath>
-                                </div>
                             </li>
                         ))}
                     </ol>

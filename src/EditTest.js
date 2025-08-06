@@ -36,10 +36,23 @@ function EditTest() {
         if (testSnap.exists()) {
           const data = testSnap.data();
           setTestName(data.testName);
-          setQuestions(data.questions);
+
+          const loadedQuestions = data.questions.map((q) => {
+            if (q.inputMode === "regular") {
+              return {
+                ...q,
+                text: q.originalText || q.text,
+                choices: q.originalChoices || q.choices,
+              };
+            }
+            return q;
+          });
+
+          setQuestions(loadedQuestions);
+
           const modes = {};
-          data.questions.forEach((_, i) => {
-            modes[i] = "latex";
+          data.questions.forEach((q, i) => {
+            modes[i] = q.inputMode || "latex";
           });
           setInputModes(modes);
         }
@@ -93,16 +106,6 @@ function EditTest() {
     setQuestions(newQuestions);
   };
 
-  const handleConvertQuestionToLatex = (qIndex) => {
-    const converted = convertTextToLatex(questions[qIndex].text);
-    handleInputChange(qIndex, "text", converted);
-  };
-
-  const handleConvertChoiceToLatex = (qIndex, cIndex) => {
-    const converted = convertTextToLatex(questions[qIndex].choices[cIndex]);
-    handleChoiceChange(qIndex, cIndex, converted);
-  };
-
   const handleAddNewQuestion = () => {
     const newQuestion = {
       title: "",
@@ -119,13 +122,20 @@ function EditTest() {
   const handleAddQuestionFromItem = (item) => {
     const newQuestion = {
       title: item.title || "",
-      text: item.text || "",
-      choices: item.choices || ["", ""],
+      text: item.inputMode === "regular" ? item.originalText : item.text,
+      choices:
+        item.inputMode === "regular"
+          ? item.originalChoices || []
+          : item.choices || [],
       correctAnswer: item.correctAnswer || "a",
+      inputMode: item.inputMode || "latex",
       isNew: false,
     };
     setQuestions([...questions, newQuestion]);
-    setInputModes((prev) => ({ ...prev, [questions.length]: "latex" }));
+    setInputModes((prev) => ({
+      ...prev,
+      [questions.length]: item.inputMode || "latex",
+    }));
     setShowAddQuestionOptions(false);
   };
 
@@ -157,14 +167,24 @@ function EditTest() {
     }
 
     const finalQuestions = questions.map((q, qIndex) => {
-      if (inputModes[qIndex] === "regular") {
+      const mode = inputModes[qIndex];
+      if (mode === "regular") {
         return {
           ...q,
           text: convertTextToLatex(q.text),
           choices: q.choices.map((choice) => convertTextToLatex(choice)),
+          originalText: q.text,
+          originalChoices: [...q.choices],
+          inputMode: "regular",
+        };
+      } else {
+        return {
+          ...q,
+          originalText: q.text,
+          originalChoices: [...q.choices],
+          inputMode: "latex",
         };
       }
-      return q;
     });
 
     const newQuestions = finalQuestions.filter((q) => q.isNew);
@@ -275,10 +295,12 @@ function EditTest() {
                     </div>
                   </div>
 
-                  <div className="alert alert-info py-2">
-                    <strong>Note:</strong> If you are using regular text, format
-                    to LaTeX prior to saving your test.
-                  </div>
+                  {inputModes[qIndex] === "latex" && (
+                    <div className="alert alert-info py-2">
+                      <strong>Note:</strong> Enter your question and choices
+                      using LaTeX syntax.
+                    </div>
+                  )}
 
                   <textarea
                     className="form-control mb-2"
@@ -293,27 +315,19 @@ function EditTest() {
                         : "Enter LaTeX"
                     }
                   />
-                  {inputModes[qIndex] === "regular" && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm mb-3"
-                      onClick={() => handleConvertQuestionToLatex(qIndex)}
-                    >
-                      Convert Question to LaTeX
-                    </button>
-                  )}
 
-                  <div
-                    className="mt-2 p-2 border bg-light"
-                    style={{
-                      maxHeight: "auto",
-                      overflowX: "auto",
-                      overflowY: "hidden",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <BlockMath>{question.text}</BlockMath>
-                  </div>
+                  {inputModes[qIndex] === "latex" && (
+                    <div
+                      className="mt-2 p-2 border bg-light"
+                      style={{
+                        maxHeight: "auto",
+                        overflowX: "auto",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <BlockMath>{question.text}</BlockMath>
+                    </div>
+                  )}
 
                   <ol type="a" className="list-group mt-3">
                     {question.choices.map((choice, cIndex) => (
@@ -330,28 +344,19 @@ function EditTest() {
                             handleChoiceChange(qIndex, cIndex, e.target.value)
                           }
                         />
-                        {inputModes[qIndex] === "regular" && (
-                          <button
-                            type="button"
-                            className="btn btn-outline-secondary btn-sm mb-2"
-                            onClick={() =>
-                              handleConvertChoiceToLatex(qIndex, cIndex)
-                            }
+
+                        {inputModes[qIndex] === "latex" && (
+                          <div
+                            className="mt-2 p-2 border bg-light"
+                            style={{
+                              maxHeight: "auto",
+                              overflowX: "auto",
+                              whiteSpace: "nowrap",
+                            }}
                           >
-                            Convert to LaTeX
-                          </button>
+                            <InlineMath>{choice}</InlineMath>
+                          </div>
                         )}
-                        <div
-                          className="mt-2 p-2 border bg-light"
-                          style={{
-                            maxHeight: "auto",
-                            overflowX: "auto",
-                            overflowY: "hidden",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          <InlineMath>{choice}</InlineMath>
-                        </div>
                       </li>
                     ))}
                   </ol>

@@ -29,15 +29,27 @@ function EditItem() {
                 const itemSnap = await getDoc(itemRef);
                 if (itemSnap.exists()) {
                     const data = itemSnap.data();
-                    setItem({
-                        title: data.title || "",
-                        text: data.text || "",
-                        choices: data.choices || ["", ""],
-                        correctAnswer: data.correctAnswer || "a",
-                        imageUrl: data.imageUrl || ""
-                    });
+                    if (data.inputMode === "regular") {
+                        setItem({
+                            title: data.title || "",
+                            text: data.originalText || "",
+                            choices: data.originalChoices || ["", ""],
+                            correctAnswer: data.correctAnswer || "a",
+                            imageUrl: data.imageUrl || ""
+                        });
+                    } else {
+                        setItem({
+                            title: data.title || "",
+                            text: data.text || "",
+                            choices: data.choices || ["", ""],
+                            correctAnswer: data.correctAnswer || "a",
+                            imageUrl: data.imageUrl || ""
+                        });
+                    }
+                    setInputMode(data.inputMode || "latex");
                 }
             } catch (error) {
+                console.error("Error fetching item:", error);
             }
         };
         fetchItem();
@@ -86,32 +98,35 @@ function EditItem() {
             .join(" \\ ");
     };
 
-    const convertQuestionToLatex = () => {
-        handleInputChange("text", convertTextToLatex(item.text));
-    };
-
-    const convertChoiceToLatex = (index) => {
-        const converted = convertTextToLatex(item.choices[index]);
-        handleChoiceChange(index, converted);
-    };
-
     const handleSaveItem = async (e) => {
         e.preventDefault();
         const currentUser = auth.currentUser;
-        if (!currentUser) {
-            return;
-        }
+        if (!currentUser) return;
+
         let finalItem = { ...item };
+
         if (inputMode === "regular") {
+            finalItem.originalText = item.text;
+            finalItem.originalChoices = [...item.choices];
+
             finalItem.text = convertTextToLatex(item.text);
             finalItem.choices = item.choices.map(choice => convertTextToLatex(choice));
+        } else {
+            finalItem.originalText = item.text;
+            finalItem.originalChoices = [...item.choices];
         }
+
         try {
             const itemRef = doc(db, "items", itemId);
-            await updateDoc(itemRef, { ...finalItem, userId: currentUser.uid });
+            await updateDoc(itemRef, {
+                ...finalItem,
+                userId: currentUser.uid,
+                inputMode: inputMode
+            });
             setSuccessMessage(true);
             setTimeout(() => navigate("/view-items"), 2000);
         } catch (error) {
+            console.error("Error updating item:", error);
         }
     };
 
@@ -138,6 +153,7 @@ function EditItem() {
                             onChange={(e) => handleInputChange("title", e.target.value)}
                         />
                     </div>
+
                     <div className="mb-3">
                         <label className="me-3">Input Mode:</label>
                         <div className="form-check form-check-inline">
@@ -169,9 +185,13 @@ function EditItem() {
                             </label>
                         </div>
                     </div>
-                    <div className="alert alert-info py-2 mb-3">
-                        <strong>Note:</strong> If you are using regular text, format to LaTeX prior to saving your item.
-                    </div>
+
+                    {inputMode === "latex" && (
+                        <div className="alert alert-info py-2 mb-3">
+                            <strong>Note:</strong> Enter your question and choices using proper LaTeX syntax.
+                        </div>
+                    )}
+
                     <div className="form-group mb-4">
                         <label>Question Text</label>
                         <textarea
@@ -181,20 +201,15 @@ function EditItem() {
                             onChange={(e) => handleInputChange("text", e.target.value)}
                             placeholder={inputMode === "regular" ? "Enter plain text" : "Enter LaTeX"}
                         />
-                        {inputMode === "regular" && (
-                            <button
-                                type="button"
-                                className="btn btn-secondary btn-sm mt-2"
-                                onClick={convertQuestionToLatex}
-                            >
-                                Convert Question to LaTeX
-                            </button>
+
+                        {inputMode === "latex" && (
+                            <div className="mt-3 p-3 border bg-light">
+                                <strong>Preview:</strong>
+                                <BlockMath>{item.text}</BlockMath>
+                            </div>
                         )}
-                        <div className="mt-3 p-3 border bg-light">
-                            <strong>Preview:</strong>
-                            <BlockMath>{item.text}</BlockMath>
-                        </div>
                     </div>
+
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
                             <li key={index} className="list-group-item position-relative border rounded mb-3" style={getChoiceStyle(index)}>
@@ -214,24 +229,20 @@ function EditItem() {
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-                                {inputMode === "regular" && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-secondary btn-sm mb-2"
-                                        onClick={() => convertChoiceToLatex(index)}
-                                    >
-                                        Convert to LaTeX
-                                    </button>
+
+                                {inputMode === "latex" && (
+                                    <div className="mt-2 p-2 border bg-light">
+                                        <InlineMath>{choice}</InlineMath>
+                                    </div>
                                 )}
-                                <div className="mt-2 p-2 border bg-light">
-                                    <InlineMath>{choice}</InlineMath>
-                                </div>
                             </li>
                         ))}
                     </ol>
+
                     <button type="button" className="btn btn-primary btn-sm mt-3" onClick={handleAddOption}>
                         Add Option
                     </button>
+
                     <h6 className="mt-3">Correct Answer:</h6>
                     <select
                         className="form-select"
@@ -244,10 +255,12 @@ function EditItem() {
                             </option>
                         ))}
                     </select>
+
                     <div className="mb-4 mt-4">
                         <button type="submit" className="btn btn-primary btn-lg">Save Changes</button>
                     </div>
                 </form>
+
                 {successMessage && (
                     <div className="alert alert-success text-center">
                         Item updated successfully!
