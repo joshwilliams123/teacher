@@ -8,6 +8,20 @@ import { InlineMath } from 'react-katex';
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, annotationPlugin);
+
 function MonitorProgress() {
   const [user, setUser] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -15,7 +29,10 @@ function MonitorProgress() {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showChartModal, setShowChartModal] = useState(false);
+  const [chartStudent, setChartStudent] = useState(null);
   const modalBodyRef = useRef(null);
+  const chartRef = useRef(null);
 
   useEffect(() => {
     const auth = getAuth();
@@ -64,6 +81,15 @@ function MonitorProgress() {
     setSelectedStudent(null);
   };
 
+  const handleShowChartModal = (student) => {
+    setChartStudent(student);
+    setShowChartModal(true);
+  };
+  const handleCloseChartModal = () => {
+    setShowChartModal(false);
+    setChartStudent(null);
+  };
+
   const getClassNameById = (id) => {
     const classObj = classes.find(cls => cls.id === id);
     return classObj ? (classObj.name || classObj.className || "Unnamed Class") : "Unknown Class";
@@ -81,6 +107,156 @@ function MonitorProgress() {
     pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save("test-analytics.pdf");
   };
+
+  const handleDownloadChartPDF = async () => {
+    if (!chartRef.current) return;
+    const canvas = await html2canvas(chartRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: [canvas.width, canvas.height]
+    });
+    pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+    pdf.save("student-performance-chart.pdf");
+  };
+
+  let chartData = null;
+  let chartOptions = {};
+  if (chartStudent) {
+    const studentTests = students.filter(
+      (s) => (s.userEmail === chartStudent.userEmail || s.userId === chartStudent.userId) && s.classId === selectedClassId
+    );
+
+    studentTests.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    const chartLabels = studentTests.map((t) => t.testTitle || `Test ${t.id}`);
+
+    const chartScoresPercent = studentTests.map((t) => {
+      const total = t.questionTimes ? t.questionTimes.length : 0;
+      return total > 0 ? ((t.score / total) * 100) : 0;
+    });
+
+    const totalSum = chartScoresPercent.reduce((sum, val) => sum + val, 0);
+    const cumulativeAverage = chartScoresPercent.length > 0 ? totalSum / chartScoresPercent.length : 0;
+
+    const barColors = chartScoresPercent.map((score) => {
+      if (score >= cumulativeAverage + 5) return "rgba(75, 192, 75, 0.8)";
+      if (score >= cumulativeAverage - 5 && score <= cumulativeAverage + 5) return "rgba(255, 206, 86, 0.8)";
+      return "rgba(255, 99, 132, 0.8)";
+    });
+
+    const chartTooltipsData = studentTests.map((t) => {
+      const total = t.questionTimes ? t.questionTimes.length : 0;
+      const date = t.timestamp ? new Date(t.timestamp).toLocaleDateString() : "N/A";
+      return { correct: t.score || 0, total, date };
+    });
+
+    chartData = {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: '',
+          data: chartScoresPercent.map(v => v.toFixed(2)),
+          backgroundColor: barColors,
+        },
+      ],
+    };
+
+    chartOptions = {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: `Overall Performance for ${chartStudent.userEmail || chartStudent.userId}`,
+          color: "#000",
+          font: {
+            family: 'Georgia',
+            size: 16,
+            weight: 'bold',
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const index = context.dataIndex;
+              const data = chartTooltipsData[index];
+              return ` ${data.correct}/${data.total} (${context.formattedValue}%) on ${data.date}`;
+            },
+          },
+        },
+        legend: {
+          display: true,
+          labels: {
+            filter: () => false,
+          },
+          onClick: null,
+        },
+        annotation: {
+          annotations: {
+            cumulativeLine: {
+              type: 'line',
+              yMin: cumulativeAverage,
+              yMax: cumulativeAverage,
+              borderColor: 'rgba(0,0,0,0.8)',
+              borderWidth: 2,
+              borderDash: [6, 6],
+              label: {
+                content: "Cumulative Average",
+                enabled: true,
+                position: 'end',
+                backgroundColor: 'rgba(0,0,0,0)',
+                color: '#000',
+                font: {
+                  family: 'Georgia',
+                  size: 14,
+                  weight: 'bold',
+                },
+                yAdjust: -10,
+                xAdjust: 10,
+                padding: 0,
+                textAlign: 'left',
+              }
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          title: {
+            display: true,
+            text: 'Score Percentage (%)',
+            font: {
+              family: 'Georgia',
+              size: 14,
+              weight: 'bold',
+            },
+            color: '#000',
+            align: 'center',
+            padding: { top: 10 },
+          },
+          ticks: {
+            font: {
+              family: 'Georgia',
+              size: 12,
+            },
+            color: '#000',
+          }
+        },
+        x: {
+          ticks: {
+            font: {
+              family: 'Georgia',
+              size: 12,
+            },
+            color: '#000',
+          }
+        }
+      }
+    };
+  }
 
   return (
     <div>
@@ -117,7 +293,7 @@ function MonitorProgress() {
                 <th>Class</th>
                 <th>Test Taken</th>
                 <th>Score</th>
-                <th>Details</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -138,10 +314,16 @@ function MonitorProgress() {
                     </td>
                     <td>
                       <button
-                        className="btn btn-sm btn-info"
+                        className="btn btn-sm btn-info me-2"
                         onClick={() => handleShowModal(student)}
                       >
                         Test Analytics
+                      </button>
+                      <button
+                        className="btn btn-sm btn-success"
+                        onClick={() => handleShowChartModal(student)}
+                      >
+                        Student's Overall Performance
                       </button>
                     </td>
                   </tr>
@@ -227,6 +409,48 @@ function MonitorProgress() {
                   Download as PDF
                 </button>
                 <button className="btn btn-secondary" onClick={handleCloseModal}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChartModal && chartData && (
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ background: "rgba(0,0,0,0.5)", zIndex: 1051 }}
+        >
+          <div className="modal-dialog modal-lg" role="document">
+            <div
+              className="modal-content"
+              style={{ fontFamily: "Georgia, serif", fontSize: "16px", color: "#000" }}
+            >
+              <div className="modal-header">
+                <h5 className="modal-title">Student's Overall Performance</h5>
+                <button type="button" className="btn-close" onClick={handleCloseChartModal}></button>
+              </div>
+              <div className="modal-body" ref={chartRef}>
+                <Bar data={chartData} options={chartOptions} />
+                <div style={{ marginTop: '10px', fontFamily: 'Georgia, serif', fontSize: '14px', color: '#000' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '20px',
+                    height: '2px',
+                    backgroundColor: 'transparent',
+                    borderTop: '2px dashed rgba(0,0,0,0.8)',
+                    marginRight: '8px',
+                    verticalAlign: 'middle'
+                  }}></span>
+                  <span>Cumulative Average Score</span>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-primary" onClick={handleDownloadChartPDF}>
+                  Download Chart as PDF
+                </button>
+                <button className="btn btn-secondary" onClick={handleCloseChartModal}>Close</button>
               </div>
             </div>
           </div>
