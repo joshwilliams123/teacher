@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { db, addDoc, collection } from "./firebase";
+import { db, addDoc, collection, storage } from "./firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
@@ -13,22 +14,28 @@ function CreateItem() {
         text: "",
         choices: ["", ""],
         correctAnswer: "a",
-        imageUrl: ""
+        questionImageUrl: "",
+        choiceImages: ["", ""]
     });
-
     const [successMessage, setSuccessMessage] = useState(false);
     const [user, setUser] = useState(null);
-    const [inputMode, setInputMode] = useState("regular"); 
-
+    const [inputMode, setInputMode] = useState("regular");
     const auth = getAuth();
     const navigate = useNavigate();
 
+    const questionFileRef = useRef(null);
+    const choiceFileRefs = useRef([]);
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+            if (currentUser !== null && user === null) {
+                setUser(currentUser);
+            } else if (currentUser === null && user !== null) {
+                setUser(null);
+            }
         });
         return () => unsubscribe();
-    }, [auth]);
+    }, [auth, user]);
 
     const handleInputChange = (field, value) => {
         setItem(prevItem => ({ ...prevItem, [field]: value }));
@@ -37,22 +44,76 @@ function CreateItem() {
     const handleChoiceChange = (index, value) => {
         const newChoices = [...item.choices];
         newChoices[index] = value;
-        setItem(prevItem => ({ ...prevItem, choices: newChoices }));
+        const newImages = [...item.choiceImages];
+        if (!newImages[index]) newImages[index] = "";
+        setItem(prevItem => ({ ...prevItem, choices: newChoices, choiceImages: newImages }));
     };
 
     const handleDeleteChoice = (index) => {
         if (item.choices.length > 2) {
             const newChoices = item.choices.filter((_, i) => i !== index);
+            const newImages = item.choiceImages.filter((_, i) => i !== index);
             setItem(prevItem => ({
                 ...prevItem,
                 choices: newChoices,
+                choiceImages: newImages,
                 correctAnswer: newChoices.length > 0 ? "a" : ""
             }));
         }
     };
 
+    const handleDeleteQuestionImage = async () => {
+        if (item.questionImageUrl) {
+            try {
+                const imageRef = ref(storage, item.questionImageUrl);
+                await deleteObject(imageRef);
+            } catch (error) {
+                console.error("Error deleting question image from storage:", error);
+            }
+        }
+        if (questionFileRef.current) {
+            questionFileRef.current.value = "";
+        }
+        setItem(prevItem => ({ ...prevItem, questionImageUrl: "" }));
+    };
+
+    const handleDeleteChoiceImage = async (index) => {
+        if (item.choiceImages[index]) {
+            try {
+                const imageRef = ref(storage, item.choiceImages[index]);
+                await deleteObject(imageRef);
+            } catch (error) {
+                console.error("Error deleting choice image from storage:", error);
+            }
+        }
+        if (choiceFileRefs.current[index]) {
+            choiceFileRefs.current[index].value = "";
+        }
+        const newImages = [...item.choiceImages];
+        newImages[index] = "";
+        setItem(prevItem => ({ ...prevItem, choiceImages: newImages }));
+    };
+
     const handleAddOption = () => {
-        setItem(prevItem => ({ ...prevItem, choices: [...prevItem.choices, ""] }));
+        setItem(prevItem => ({
+            ...prevItem,
+            choices: [...prevItem.choices, ""],
+            choiceImages: [...prevItem.choiceImages, ""]
+        }));
+    };
+
+    const handleImageUpload = async (file, type, index = null) => {
+        if (!file) return;
+        const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        if (type === "question") {
+            setItem(prev => ({ ...prev, questionImageUrl: url }));
+        } else if (type === "choice" && index !== null) {
+            const newImages = [...item.choiceImages];
+            newImages[index] = url;
+            setItem(prev => ({ ...prev, choiceImages: newImages }));
+        }
     };
 
     const handleSaveItem = async (e) => {
@@ -61,20 +122,16 @@ function CreateItem() {
             alert("You must be logged in to save items.");
             return;
         }
-
         let finalItem = { ...item };
-
         if (inputMode === "regular") {
             finalItem.originalText = item.text;
             finalItem.originalChoices = [...item.choices];
-
             finalItem.text = convertTextToLatex(item.text);
             finalItem.choices = item.choices.map(choice => convertTextToLatex(choice));
         } else {
             finalItem.originalText = item.text;
             finalItem.originalChoices = [...item.choices];
         }
-
         try {
             await addDoc(collection(db, "items"), {
                 ...finalItem,
@@ -98,10 +155,10 @@ function CreateItem() {
     const convertTextToLatex = (text) => {
         if (!text.trim()) return text;
         if (text.includes("\\text{")) return text;
-        const tokens = text.split(/\s+/); 
+        const tokens = text.split(/\s+/);
         return tokens
             .map(token => /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)
-            .join(" \\ "); 
+            .join(" \\ ");
     };
 
     return (
@@ -123,7 +180,6 @@ function CreateItem() {
                             onChange={(e) => handleInputChange("title", e.target.value)}
                         />
                     </div>
-
                     <div className="mb-3">
                         <label className="me-3">Input Mode:</label>
                         <div className="form-check form-check-inline">
@@ -155,13 +211,42 @@ function CreateItem() {
                             </label>
                         </div>
                     </div>
-
                     {inputMode === "latex" && (
                         <div className="alert alert-info py-2 mb-3">
                             <strong>Note:</strong> Enter your question and choices using proper LaTeX syntax.
                         </div>
                     )}
-
+                    <div className="form-group mb-4">
+                        <label>Question Image</label>
+                        <br />
+                        {!item.questionImageUrl ? (
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => questionFileRef.current.click()}
+                            >
+                                Add Image
+                            </button>
+                        ) : (
+                            <div className="position-relative d-inline-block">
+                                <img src={item.questionImageUrl} alt="Question Preview" style={{ maxWidth: "200px", marginTop: "10px" }} />
+                                <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                                    onClick={handleDeleteQuestionImage}
+                                >
+                                    X
+                                </button>
+                            </div>
+                        )}
+                        <input
+                            type="file"
+                            accept="image/*"
+                            ref={questionFileRef}
+                            style={{ display: "none" }}
+                            onChange={(e) => handleImageUpload(e.target.files[0], "question")}
+                        />
+                    </div>
                     <div className="form-group mb-4">
                         <label>Question Text</label>
                         <textarea
@@ -171,7 +256,6 @@ function CreateItem() {
                             onChange={(e) => handleInputChange("text", e.target.value)}
                             placeholder={inputMode === "regular" ? "Enter question in plain text" : "Enter LaTeX formatted question"}
                         />
-
                         {inputMode === "latex" && (
                             <div className="mt-3 p-3 border bg-light">
                                 <strong>Preview:</strong>
@@ -179,7 +263,6 @@ function CreateItem() {
                             </div>
                         )}
                     </div>
-
                     <ol type="a" className="list-group">
                         {item.choices.map((choice, index) => (
                             <li key={index} className="list-group-item border-0 position-relative" style={getChoiceStyle(index)}>
@@ -196,7 +279,33 @@ function CreateItem() {
                                     value={choice}
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
-
+                                {!item.choiceImages[index] ? (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => choiceFileRefs.current[index].click()}
+                                    >
+                                        Add Image
+                                    </button>
+                                ) : (
+                                    <div className="position-relative d-inline-block">
+                                        <img src={item.choiceImages[index]} alt={`Choice ${index + 1}`} style={{ maxWidth: "150px", marginTop: "10px" }} />
+                                        <button
+                                            type="button"
+                                            className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                                            onClick={() => handleDeleteChoiceImage(index)}
+                                        >
+                                            X
+                                        </button>
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={(el) => choiceFileRefs.current[index] = el}
+                                    style={{ display: "none" }}
+                                    onChange={(e) => handleImageUpload(e.target.files[0], "choice", index)}
+                                />
                                 {inputMode === "latex" && (
                                     <div className="mt-2 p-2 border bg-light">
                                         <InlineMath>{choice}</InlineMath>
@@ -205,7 +314,6 @@ function CreateItem() {
                             </li>
                         ))}
                     </ol>
-
                     <button
                         type="button"
                         className="btn btn-primary btn-sm mt-3"
@@ -213,7 +321,6 @@ function CreateItem() {
                     >
                         Add Option
                     </button>
-
                     <h6 className="mt-3">Correct Answer:</h6>
                     <select
                         className="form-select"
@@ -226,12 +333,10 @@ function CreateItem() {
                             </option>
                         ))}
                     </select>
-
                     <div className="mb-4 mt-3">
                         <button type="submit" className="btn btn-primary btn-lg">Save Item</button>
                     </div>
                 </form>
-
                 {successMessage && (
                     <div className="alert alert-success text-center">
                         <p>Your item was saved successfully!</p>

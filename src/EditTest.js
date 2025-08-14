@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
@@ -12,10 +12,11 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 function EditTest() {
   const { testId } = useParams();
@@ -27,6 +28,9 @@ function EditTest() {
   const [showAddQuestionOptions, setShowAddQuestionOptions] = useState(false);
   const auth = getAuth();
   const navigate = useNavigate();
+
+  const questionFileRefs = useRef([]);
+  const choiceFileRefs = useRef([]);
 
   useEffect(() => {
     const fetchTest = async () => {
@@ -43,9 +47,15 @@ function EditTest() {
                 ...q,
                 text: q.originalText || q.text,
                 choices: q.originalChoices || q.choices,
+                questionImageUrl: q.questionImageUrl || "",
+                choiceImages: q.choiceImages || []
               };
             }
-            return q;
+            return {
+              ...q,
+              questionImageUrl: q.questionImageUrl || "",
+              choiceImages: q.choiceImages || []
+            };
           });
 
           setQuestions(loadedQuestions);
@@ -106,12 +116,71 @@ function EditTest() {
     setQuestions(newQuestions);
   };
 
+  const handleImageUpload = async (file, type, qIndex, cIndex = null) => {
+    if (!file) return;
+    const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    
+    const newQuestions = [...questions];
+    if (type === "question") {
+      newQuestions[qIndex].questionImageUrl = url;
+    } else if (type === "choice" && cIndex !== null) {
+      if (!newQuestions[qIndex].choiceImages) {
+        newQuestions[qIndex].choiceImages = [];
+      }
+      newQuestions[qIndex].choiceImages[cIndex] = url;
+    }
+    setQuestions(newQuestions);
+  };
+
+  const handleDeleteQuestionImage = async (qIndex) => {
+    const question = questions[qIndex];
+    if (question.questionImageUrl) {
+      try {
+        const imageRef = ref(storage, question.questionImageUrl);
+        await deleteObject(imageRef);
+      } catch (error) {
+        console.error("Error deleting question image from storage:", error);
+      }
+    }
+    if (questionFileRefs.current[qIndex]) {
+      questionFileRefs.current[qIndex].value = "";
+    }
+    const newQuestions = [...questions];
+    newQuestions[qIndex].questionImageUrl = "";
+    setQuestions(newQuestions);
+  };
+
+  const handleDeleteChoiceImage = async (qIndex, cIndex) => {
+    const question = questions[qIndex];
+    if (question.choiceImages && question.choiceImages[cIndex]) {
+      try {
+        const imageRef = ref(storage, question.choiceImages[cIndex]);
+        await deleteObject(imageRef);
+      } catch (error) {
+        console.error("Error deleting choice image from storage:", error);
+      }
+    }
+    if (choiceFileRefs.current[qIndex] && choiceFileRefs.current[qIndex][cIndex]) {
+      choiceFileRefs.current[qIndex][cIndex].value = "";
+    }
+    const newQuestions = [...questions];
+    if (!newQuestions[qIndex].choiceImages) {
+      newQuestions[qIndex].choiceImages = [];
+    }
+    newQuestions[qIndex].choiceImages[cIndex] = "";
+    setQuestions(newQuestions);
+  };
+
   const handleAddNewQuestion = () => {
     const newQuestion = {
       title: "",
       text: "",
       choices: ["", ""],
       correctAnswer: "a",
+      questionImageUrl: "",
+      choiceImages: ["", ""],
       isNew: true,
     };
     setQuestions([...questions, newQuestion]);
@@ -128,6 +197,8 @@ function EditTest() {
           ? item.originalChoices || []
           : item.choices || [],
       correctAnswer: item.correctAnswer || "a",
+      questionImageUrl: item.questionImageUrl || "",
+      choiceImages: item.choiceImages || [],
       inputMode: item.inputMode || "latex",
       isNew: false,
     };
@@ -142,6 +213,29 @@ function EditTest() {
   const handleAddOption = (qIndex) => {
     const newQuestions = [...questions];
     newQuestions[qIndex].choices.push("");
+    if (!newQuestions[qIndex].choiceImages) {
+      newQuestions[qIndex].choiceImages = [];
+    }
+    newQuestions[qIndex].choiceImages.push("");
+    setQuestions(newQuestions);
+  };
+
+  const handleDeleteOption = (qIndex, cIndex) => {
+    const newQuestions = [...questions];
+    if (newQuestions[qIndex].choices.length <= 2) return;
+    
+    newQuestions[qIndex].choices.splice(cIndex, 1);
+    if (newQuestions[qIndex].choiceImages) {
+      newQuestions[qIndex].choiceImages.splice(cIndex, 1);
+    }
+    
+    const correctIndex = newQuestions[qIndex].correctAnswer.charCodeAt(0) - 97;
+    if (cIndex < correctIndex) {
+      newQuestions[qIndex].correctAnswer = String.fromCharCode(correctIndex - 1 + 97);
+    } else if (cIndex === correctIndex) {
+      newQuestions[qIndex].correctAnswer = "a";
+    }
+    
     setQuestions(newQuestions);
   };
 
@@ -302,6 +396,46 @@ function EditTest() {
                     </div>
                   )}
 
+                  <div className="form-group mb-4">
+                    <label>Question Image</label>
+                    <br />
+                    {!question.questionImageUrl ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => questionFileRefs.current[qIndex]?.click()}
+                      >
+                        Add Image
+                      </button>
+                    ) : (
+                      <div className="position-relative d-inline-block">
+                        <img
+                          src={question.questionImageUrl}
+                          alt="Question"
+                          style={{ maxWidth: "200px", marginTop: "10px" }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                          onClick={() => handleDeleteQuestionImage(qIndex)}
+                        >
+                          X
+                        </button>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={(el) => {
+                        if (!questionFileRefs.current[qIndex]) {
+                          questionFileRefs.current[qIndex] = el;
+                        }
+                      }}
+                      style={{ display: "none" }}
+                      onChange={(e) => handleImageUpload(e.target.files[0], "question", qIndex)}
+                    />
+                  </div>
+
                   <textarea
                     className="form-control mb-2"
                     rows="4"
@@ -333,9 +467,18 @@ function EditTest() {
                     {question.choices.map((choice, cIndex) => (
                       <li
                         key={cIndex}
-                        className="list-group-item border-0"
+                        className="list-group-item border-0 position-relative"
                         style={getChoiceStyle(qIndex, cIndex)}
                       >
+                        {question.choices.length > 2 && (
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                            onClick={() => handleDeleteOption(qIndex, cIndex)}
+                          >
+                            X
+                          </button>
+                        )}
                         <input
                           className="form-control mb-2"
                           placeholder={`Answer Choice ${cIndex + 1}`}
@@ -343,6 +486,48 @@ function EditTest() {
                           onChange={(e) =>
                             handleChoiceChange(qIndex, cIndex, e.target.value)
                           }
+                        />
+
+                        {!(question.choiceImages && question.choiceImages[cIndex]) ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              if (!choiceFileRefs.current[qIndex]) {
+                                choiceFileRefs.current[qIndex] = [];
+                              }
+                              choiceFileRefs.current[qIndex][cIndex]?.click();
+                            }}
+                          >
+                            Add Image
+                          </button>
+                        ) : (
+                          <div className="position-relative d-inline-block">
+                            <img
+                              src={question.choiceImages[cIndex]}
+                              alt={`Choice ${cIndex + 1}`}
+                              style={{ maxWidth: "150px", marginTop: "10px" }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                              onClick={() => handleDeleteChoiceImage(qIndex, cIndex)}
+                            >
+                              X
+                            </button>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={(el) => {
+                            if (!choiceFileRefs.current[qIndex]) {
+                              choiceFileRefs.current[qIndex] = [];
+                            }
+                            choiceFileRefs.current[qIndex][cIndex] = el;
+                          }}
+                          style={{ display: "none" }}
+                          onChange={(e) => handleImageUpload(e.target.files[0], "choice", qIndex, cIndex)}
                         />
 
                         {inputModes[qIndex] === "latex" && (

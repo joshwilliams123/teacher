@@ -52,11 +52,9 @@ function ViewItems() {
         return;
       }
 
-      console.log("Current user UID:", currentUser.uid);
 
       await deleteDoc(doc(db, "items", String(itemId)));
       setItems((prevItems) => prevItems.filter((item) => item.id !== String(itemId)));
-      console.log("Item deleted successfully");
     } catch (error) {
       console.error("Error deleting item: ", error);
     }
