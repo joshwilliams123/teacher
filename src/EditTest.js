@@ -26,6 +26,11 @@ function EditTest() {
   const [inputModes, setInputModes] = useState({});
   const [items, setItems] = useState([]);
   const [showAddQuestionOptions, setShowAddQuestionOptions] = useState(false);
+  const [className, setClassName] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
   const auth = getAuth();
   const navigate = useNavigate();
 
@@ -40,6 +45,7 @@ function EditTest() {
         if (testSnap.exists()) {
           const data = testSnap.data();
           setTestName(data.testName);
+          setClassName(data.classNames || []);
 
           const loadedQuestions = data.questions.map((q) => {
             if (q.inputMode === "regular") {
@@ -90,14 +96,33 @@ function EditTest() {
       }
     };
 
+    const fetchClasses = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      try {
+        const q = query(
+          collection(db, "classes"),
+          where("userId", "==", currentUser.uid)
+        );
+        const snapshot = await getDocs(q);
+        const classList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setClasses(classList);
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+      }
+    };
+
     fetchTest();
     fetchItems();
+    fetchClasses();
   }, [testId]);
 
   const convertTextToLatex = (text) => {
     if (!text.trim()) return text;
     if (text.includes("\\text{")) return text;
-
     const tokens = text.split(/\s+/);
     return tokens
       .map((token) => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`))
@@ -121,7 +146,7 @@ function EditTest() {
     const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
-    
+
     const newQuestions = [...questions];
     if (type === "question") {
       newQuestions[qIndex].questionImageUrl = url;
@@ -223,19 +248,16 @@ function EditTest() {
   const handleDeleteOption = (qIndex, cIndex) => {
     const newQuestions = [...questions];
     if (newQuestions[qIndex].choices.length <= 2) return;
-    
     newQuestions[qIndex].choices.splice(cIndex, 1);
     if (newQuestions[qIndex].choiceImages) {
       newQuestions[qIndex].choiceImages.splice(cIndex, 1);
     }
-    
     const correctIndex = newQuestions[qIndex].correctAnswer.charCodeAt(0) - 97;
     if (cIndex < correctIndex) {
       newQuestions[qIndex].correctAnswer = String.fromCharCode(correctIndex - 1 + 97);
     } else if (cIndex === correctIndex) {
       newQuestions[qIndex].correctAnswer = "a";
     }
-    
     setQuestions(newQuestions);
   };
 
@@ -250,6 +272,12 @@ function EditTest() {
       String.fromCharCode(97 + cIndex)
       ? { backgroundColor: "lightgreen" }
       : {};
+  };
+
+  const toggleClassSelection = (name) => {
+    setClassName((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+    );
   };
 
   const handleSaveTest = async (e) => {
@@ -299,6 +327,7 @@ function EditTest() {
       const testRef = doc(db, "tests", testId);
       await updateDoc(testRef, {
         testName,
+        classNames: className,
         questions: cleanedQuestions,
         userId: currentUser.uid,
       });
@@ -320,6 +349,41 @@ function EditTest() {
 
       <main className="container">
         <form onSubmit={handleSaveTest}>
+          <div className="form-group mb-4" ref={dropdownRef}>
+            <label htmlFor="class-name">Assign to Classes</label>
+            <div
+              className="form-control d-flex justify-content-between align-items-center"
+              onClick={() => setShowDropdown(!showDropdown)}
+              style={{ cursor: "pointer", position: "relative" }}
+            >
+              {className.length > 0 ? className.join(", ") : "Select classes"}
+              <span className="caret">&#9662;</span>
+            </div>
+            {showDropdown && (
+              <div
+                className="border rounded bg-white mt-1 p-2 shadow-sm"
+                style={{ position: "absolute", zIndex: 10, width: "100%" }}
+              >
+                {[...classes]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((cls) => (
+                    <div key={cls.id} className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={`class-${cls.id}`}
+                        checked={className.includes(cls.name)}
+                        onChange={() => toggleClassSelection(cls.name)}
+                      />
+                      <label className="form-check-label" htmlFor={`class-${cls.id}`}>
+                        {cls.name}
+                      </label>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
           <div className="form-group mb-4">
             <label htmlFor="test-name">Test Name</label>
             <input
@@ -391,8 +455,7 @@ function EditTest() {
 
                   {inputModes[qIndex] === "latex" && (
                     <div className="alert alert-info py-2">
-                      <strong>Note:</strong> Enter your question and choices
-                      using LaTeX syntax.
+                      <strong>Note:</strong> Enter your question and choices using LaTeX syntax.
                     </div>
                   )}
 
@@ -432,7 +495,9 @@ function EditTest() {
                         }
                       }}
                       style={{ display: "none" }}
-                      onChange={(e) => handleImageUpload(e.target.files[0], "question", qIndex)}
+                      onChange={(e) =>
+                        handleImageUpload(e.target.files[0], "question", qIndex)
+                      }
                     />
                   </div>
 
@@ -527,7 +592,14 @@ function EditTest() {
                             choiceFileRefs.current[qIndex][cIndex] = el;
                           }}
                           style={{ display: "none" }}
-                          onChange={(e) => handleImageUpload(e.target.files[0], "choice", qIndex, cIndex)}
+                          onChange={(e) =>
+                            handleImageUpload(
+                              e.target.files[0],
+                              "choice",
+                              qIndex,
+                              cIndex
+                            )
+                          }
                         />
 
                         {inputModes[qIndex] === "latex" && (
