@@ -16,7 +16,7 @@ import { db, storage } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function EditTest() {
   const { testId } = useParams();
@@ -160,15 +160,6 @@ function EditTest() {
   };
 
   const handleDeleteQuestionImage = async (qIndex) => {
-    const question = questions[qIndex];
-    if (question.questionImageUrl) {
-      try {
-        const imageRef = ref(storage, question.questionImageUrl);
-        await deleteObject(imageRef);
-      } catch (error) {
-        console.error("Error deleting question image from storage:", error);
-      }
-    }
     if (questionFileRefs.current[qIndex]) {
       questionFileRefs.current[qIndex].value = "";
     }
@@ -178,15 +169,6 @@ function EditTest() {
   };
 
   const handleDeleteChoiceImage = async (qIndex, cIndex) => {
-    const question = questions[qIndex];
-    if (question.choiceImages && question.choiceImages[cIndex]) {
-      try {
-        const imageRef = ref(storage, question.choiceImages[cIndex]);
-        await deleteObject(imageRef);
-      } catch (error) {
-        console.error("Error deleting choice image from storage:", error);
-      }
-    }
     if (choiceFileRefs.current[qIndex] && choiceFileRefs.current[qIndex][cIndex]) {
       choiceFileRefs.current[qIndex][cIndex].value = "";
     }

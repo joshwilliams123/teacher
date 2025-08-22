@@ -93,9 +93,9 @@ function ViewItems() {
                     <InlineMath math={item.text || ""} />
                   </p>
 
-                  {item.imageUrl && (
+                  {item.questionImageUrl && (
                     <img
-                      src={item.imageUrl}
+                      src={item.questionImageUrl}
                       alt="Item"
                       className="img-fluid mb-2"
                       style={{ maxHeight: "150px" }}
@@ -116,8 +116,8 @@ function ViewItems() {
                           <li
                             key={index}
                             className={`list-group-item ${item.correctAnswer === String.fromCharCode(97 + index)
-                                ? "bg-success text-white"
-                                : ""
+                              ? "bg-success text-white"
+                              : ""
                               }`}
                             style={{
                               border: "none",
