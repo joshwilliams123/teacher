@@ -3,11 +3,12 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "firebase/firestore";
 import { db, storage } from "./firebase";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAuth } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { addDoc } from "firebase/firestore";
 
 function EditItem() {
     const { itemId } = useParams();
@@ -24,6 +25,12 @@ function EditItem() {
     const [inputMode, setInputMode] = useState("latex");
     const [newQuestionImage, setNewQuestionImage] = useState(null);
     const [newChoiceImages, setNewChoiceImages] = useState([]);
+    const [imageBank, setImageBank] = useState([]);
+    const [showImageBank, setShowImageBank] = useState(false);
+    const [imageBankType, setImageBankType] = useState("");
+    const [imageBankChoiceIndex, setImageBankChoiceIndex] = useState(null);
+    const [questionImageFromBank, setQuestionImageFromBank] = useState(false);
+    const [choiceImagesFromBank, setChoiceImagesFromBank] = useState([]);
     const auth = getAuth();
 
     const questionFileRef = useRef(null);
@@ -45,14 +52,31 @@ function EditItem() {
                         choiceImages: data.choiceImages || []
                     });
                     setNewChoiceImages(new Array((data.choices || ["", ""]).length).fill(null));
+                    setChoiceImagesFromBank(new Array((data.choices || ["", ""]).length).fill(false));
                     setInputMode(data.inputMode || "latex");
                 }
-            } catch (error) {
-                console.error("Error fetching item:", error);
-            }
+            } catch (error) {}
         };
         fetchItem();
     }, [itemId]);
+
+    useEffect(() => {
+        async function fetchImages() {
+            const imagesCol = collection(db, "images");
+            const snapshot = await getDocs(imagesCol);
+            setImageBank(snapshot.docs.map(doc => doc.data().url));
+        }
+        fetchImages();
+    }, []);
+
+    const deleteImageReference = async (url) => {
+        const imagesCol = collection(db, "images");
+        const q = query(imagesCol, where("url", "==", url));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(async (docSnap) => {
+            await deleteDoc(docSnap.ref);
+        });
+    };
 
     const handleInputChange = (field, value) => {
         setItem((prevItem) => ({ ...prevItem, [field]: value }));
@@ -71,12 +95,14 @@ function EditItem() {
             choiceImages: [...prevItem.choiceImages, ""]
         }));
         setNewChoiceImages(prev => [...prev, null]);
+        setChoiceImagesFromBank(prev => [...prev, false]);
     };
 
     const handleDeleteOption = (indexToRemove) => {
         if (item.choices.length <= 2) return;
         const newChoices = item.choices.filter((_, index) => index !== indexToRemove);
         const newChoiceImagesArr = item.choiceImages.filter((_, index) => index !== indexToRemove);
+        const newChoiceImagesFromBank = choiceImagesFromBank.filter((_, index) => index !== indexToRemove);
         let newCorrectAnswer = item.correctAnswer;
         const correctIndex = item.correctAnswer.charCodeAt(0) - 97;
         if (indexToRemove < correctIndex) {
@@ -91,32 +117,32 @@ function EditItem() {
             correctAnswer: newCorrectAnswer
         }));
         setNewChoiceImages(prev => prev.filter((_, index) => index !== indexToRemove));
+        setChoiceImagesFromBank(newChoiceImagesFromBank);
     };
 
     const handleDeleteQuestionImage = async () => {
-        if (item.questionImageUrl) {
+        if (item.questionImageUrl && !questionImageFromBank) {
             try {
                 const imageRef = ref(storage, item.questionImageUrl);
                 await deleteObject(imageRef);
-            } catch (error) {
-                console.error("Error deleting question image from storage:", error);
-            }
+                await deleteImageReference(item.questionImageUrl);
+            } catch (error) {}
         }
         if (questionFileRef.current) {
             questionFileRef.current.value = "";
         }
         setItem(prevItem => ({ ...prevItem, questionImageUrl: "" }));
         setNewQuestionImage(null);
+        setQuestionImageFromBank(false);
     };
 
     const handleDeleteChoiceImage = async (index) => {
-        if (item.choiceImages[index]) {
+        if (item.choiceImages[index] && !choiceImagesFromBank[index]) {
             try {
                 const imageRef = ref(storage, item.choiceImages[index]);
                 await deleteObject(imageRef);
-            } catch (error) {
-                console.error("Error deleting choice image from storage:", error);
-            }
+                await deleteImageReference(item.choiceImages[index]);
+            } catch (error) {}
         }
         if (choiceFileRefs.current[index]) {
             choiceFileRefs.current[index].value = "";
@@ -127,6 +153,9 @@ function EditItem() {
         const updatedNewChoiceImages = [...newChoiceImages];
         updatedNewChoiceImages[index] = null;
         setNewChoiceImages(updatedNewChoiceImages);
+        const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+        updatedChoiceImagesFromBank[index] = false;
+        setChoiceImagesFromBank(updatedChoiceImagesFromBank);
     };
 
     const convertTextToLatex = (text) => {
@@ -139,6 +168,7 @@ function EditItem() {
     const handleQuestionImageChange = (e) => {
         if (e.target.files[0]) {
             setNewQuestionImage(e.target.files[0]);
+            setQuestionImageFromBank(false);
         }
     };
 
@@ -146,6 +176,59 @@ function EditItem() {
         const updatedNewChoiceImages = [...newChoiceImages];
         updatedNewChoiceImages[index] = file;
         setNewChoiceImages(updatedNewChoiceImages);
+        const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+        updatedChoiceImagesFromBank[index] = false;
+        setChoiceImagesFromBank(updatedChoiceImagesFromBank);
+    };
+
+    const handleImageUpload = async (file, type, index = null) => {
+        if (!file) return;
+        const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        await addDoc(collection(db, "images"), { url });
+        if (type === "question") {
+            setItem(prev => ({ ...prev, questionImageUrl: url }));
+            setNewQuestionImage(null);
+            setQuestionImageFromBank(false);
+        } else if (type === "choice" && index !== null) {
+            const newImages = [...item.choiceImages];
+            newImages[index] = url;
+            setItem(prev => ({ ...prev, choiceImages: newImages }));
+            const updatedNewChoiceImages = [...newChoiceImages];
+            updatedNewChoiceImages[index] = null;
+            setNewChoiceImages(updatedNewChoiceImages);
+            const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+            updatedChoiceImagesFromBank[index] = false;
+            setChoiceImagesFromBank(updatedChoiceImagesFromBank);
+        }
+    };
+
+    const openImageBank = (type, index = null) => {
+        setImageBankType(type);
+        setImageBankChoiceIndex(index);
+        setShowImageBank(true);
+    };
+
+    const handleSelectImageFromBank = (url) => {
+        if (imageBankType === "question") {
+            setItem(prev => ({ ...prev, questionImageUrl: url }));
+            setNewQuestionImage(null);
+            setQuestionImageFromBank(true);
+        } else if (imageBankType === "choice" && imageBankChoiceIndex !== null) {
+            const newImages = [...item.choiceImages];
+            newImages[imageBankChoiceIndex] = url;
+            setItem(prev => ({ ...prev, choiceImages: newImages }));
+            const updatedNewChoiceImages = [...newChoiceImages];
+            updatedNewChoiceImages[imageBankChoiceIndex] = null;
+            setNewChoiceImages(updatedNewChoiceImages);
+            const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+            updatedChoiceImagesFromBank[imageBankChoiceIndex] = true;
+            setChoiceImagesFromBank(updatedChoiceImagesFromBank);
+        }
+        setShowImageBank(false);
+        setImageBankType("");
+        setImageBankChoiceIndex(null);
     };
 
     const handleSaveItem = async (e) => {
@@ -169,6 +252,7 @@ function EditItem() {
             await uploadBytes(imageRef, newQuestionImage);
             const downloadURL = await getDownloadURL(imageRef);
             finalItem.questionImageUrl = downloadURL;
+            await addDoc(collection(db, "images"), { url: downloadURL });
         }
 
         const updatedChoiceImages = [...finalItem.choiceImages];
@@ -178,6 +262,7 @@ function EditItem() {
                 await uploadBytes(imageRef, newChoiceImages[i]);
                 const downloadURL = await getDownloadURL(imageRef);
                 updatedChoiceImages[i] = downloadURL;
+                await addDoc(collection(db, "images"), { url: downloadURL });
             }
         }
         finalItem.choiceImages = updatedChoiceImages;
@@ -191,9 +276,7 @@ function EditItem() {
             });
             setSuccessMessage(true);
             setTimeout(() => navigate("/view-items"), 2000);
-        } catch (error) {
-            console.error("Error updating item:", error);
-        }
+        } catch (error) {}
     };
 
     const getChoiceStyle = (index) => {
@@ -270,13 +353,22 @@ function EditItem() {
                         <label>Question Image</label>
                         <br />
                         {!hasQuestionImage ? (
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => questionFileRef.current.click()}
-                            >
-                                Add Image
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary me-2"
+                                    onClick={() => questionFileRef.current.click()}
+                                >
+                                    Add Image
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-info"
+                                    onClick={() => openImageBank("question")}
+                                >
+                                    Select from Image Bank
+                                </button>
+                            </>
                         ) : (
                             <div className="position-relative d-inline-block">
                                 {newQuestionImage ? (
@@ -326,13 +418,22 @@ function EditItem() {
                                     </div>
                                 )}
                                 {!hasChoiceImage(index) ? (
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => choiceFileRefs.current[index].click()}
-                                    >
-                                        Add Image
-                                    </button>
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary me-2"
+                                            onClick={() => choiceFileRefs.current[index].click()}
+                                        >
+                                            Add Image
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-info"
+                                            onClick={() => openImageBank("choice", index)}
+                                        >
+                                            Select from Image Bank
+                                        </button>
+                                    </>
                                 ) : (
                                     <div className="position-relative d-inline-block">
                                         {newChoiceImages[index] ? (
@@ -381,6 +482,32 @@ function EditItem() {
                 {successMessage && (
                     <div className="alert alert-success text-center">
                         Item updated successfully!
+                    </div>
+                )}
+                {showImageBank && (
+                    <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,0.5)" }}>
+                        <div className="modal-dialog">
+                            <div className="modal-content">
+                                <div className="modal-header">
+                                    <h5 className="modal-title">Select Image from Bank</h5>
+                                    <button type="button" className="btn-close" onClick={() => setShowImageBank(false)}></button>
+                                </div>
+                                <div className="modal-body">
+                                    <div className="d-flex flex-wrap">
+                                        {imageBank.length === 0 && <p>No images available.</p>}
+                                        {imageBank.map((url, idx) => (
+                                            <img
+                                                key={idx}
+                                                src={url}
+                                                alt={`Bank ${idx}`}
+                                                style={{ maxWidth: "100px", margin: "5px", cursor: "pointer", border: "2px solid #eee" }}
+                                                onClick={() => handleSelectImageFromBank(url)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>

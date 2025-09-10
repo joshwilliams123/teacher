@@ -11,12 +11,13 @@ import {
   getDocs,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { db, storage } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 function EditTest() {
   const { testId } = useParams();
@@ -29,6 +30,13 @@ function EditTest() {
   const [className, setClassName] = useState([]);
   const [classes, setClasses] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [imageBank, setImageBank] = useState([]);
+  const [showImageBank, setShowImageBank] = useState(false);
+  const [imageBankType, setImageBankType] = useState("");
+  const [imageBankQIndex, setImageBankQIndex] = useState(null);
+  const [imageBankChoiceIndex, setImageBankChoiceIndex] = useState(null);
+  const [questionImagesFromBank, setQuestionImagesFromBank] = useState([]);
+  const [choiceImagesFromBank, setChoiceImagesFromBank] = useState([]);
   const dropdownRef = useRef(null);
 
   const auth = getAuth();
@@ -46,7 +54,6 @@ function EditTest() {
           const data = testSnap.data();
           setTestName(data.testName);
           setClassName(data.classNames || []);
-
           const loadedQuestions = data.questions.map((q) => {
             if (q.inputMode === "regular") {
               return {
@@ -63,18 +70,16 @@ function EditTest() {
               choiceImages: q.choiceImages || []
             };
           });
-
           setQuestions(loadedQuestions);
-
           const modes = {};
           data.questions.forEach((q, i) => {
             modes[i] = q.inputMode || "latex";
           });
           setInputModes(modes);
+          setQuestionImagesFromBank(new Array(loadedQuestions.length).fill(false));
+          setChoiceImagesFromBank(loadedQuestions.map(q => new Array((q.choices || []).length).fill(false)));
         }
-      } catch (error) {
-        console.error("Error fetching test: ", error);
-      }
+      } catch (error) {}
     };
 
     const fetchItems = async () => {
@@ -91,9 +96,7 @@ function EditTest() {
           ...doc.data(),
         }));
         setItems(itemList);
-      } catch (error) {
-        console.error("Error fetching items:", error);
-      }
+      } catch (error) {}
     };
 
     const fetchClasses = async () => {
@@ -110,15 +113,29 @@ function EditTest() {
           ...doc.data(),
         }));
         setClasses(classList);
-      } catch (error) {
-        console.error("Error fetching classes:", error);
-      }
+      } catch (error) {}
+    };
+
+    const fetchImages = async () => {
+      const imagesCol = collection(db, "images");
+      const snapshot = await getDocs(imagesCol);
+      setImageBank(snapshot.docs.map(doc => doc.data().url));
     };
 
     fetchTest();
     fetchItems();
     fetchClasses();
+    fetchImages();
   }, [testId]);
+
+  const deleteImageReference = async (url) => {
+    const imagesCol = collection(db, "images");
+    const q = query(imagesCol, where("url", "==", url));
+    const snapshot = await getDocs(q);
+    snapshot.forEach(async (docSnap) => {
+      await deleteDoc(docSnap.ref);
+    });
+  };
 
   const convertTextToLatex = (text) => {
     if (!text.trim()) return text;
@@ -146,29 +163,63 @@ function EditTest() {
     const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
-
     const newQuestions = [...questions];
     if (type === "question") {
       newQuestions[qIndex].questionImageUrl = url;
+      setQuestions(newQuestions);
+      const updatedQuestionImagesFromBank = [...questionImagesFromBank];
+      updatedQuestionImagesFromBank[qIndex] = false;
+      setQuestionImagesFromBank(updatedQuestionImagesFromBank);
     } else if (type === "choice" && cIndex !== null) {
       if (!newQuestions[qIndex].choiceImages) {
         newQuestions[qIndex].choiceImages = [];
       }
       newQuestions[qIndex].choiceImages[cIndex] = url;
+      setQuestions(newQuestions);
+      const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+      if (!updatedChoiceImagesFromBank[qIndex]) {
+        updatedChoiceImagesFromBank[qIndex] = [];
+      }
+      updatedChoiceImagesFromBank[qIndex][cIndex] = false;
+      setChoiceImagesFromBank(updatedChoiceImagesFromBank);
     }
-    setQuestions(newQuestions);
+    await addDoc(collection(db, "images"), { url });
   };
 
   const handleDeleteQuestionImage = async (qIndex) => {
+    if (questions[qIndex].questionImageUrl && !questionImagesFromBank[qIndex]) {
+      try {
+        const imageRef = ref(storage, questions[qIndex].questionImageUrl);
+        await deleteObject(imageRef);
+        await deleteImageReference(questions[qIndex].questionImageUrl);
+      } catch (error) {}
+    }
     if (questionFileRefs.current[qIndex]) {
       questionFileRefs.current[qIndex].value = "";
     }
     const newQuestions = [...questions];
     newQuestions[qIndex].questionImageUrl = "";
     setQuestions(newQuestions);
+    const updatedQuestionImagesFromBank = [...questionImagesFromBank];
+    updatedQuestionImagesFromBank[qIndex] = false;
+    setQuestionImagesFromBank(updatedQuestionImagesFromBank);
   };
 
   const handleDeleteChoiceImage = async (qIndex, cIndex) => {
+    if (
+      questions[qIndex].choiceImages &&
+      questions[qIndex].choiceImages[cIndex] &&
+      !(
+        choiceImagesFromBank[qIndex] &&
+        choiceImagesFromBank[qIndex][cIndex]
+      )
+    ) {
+      try {
+        const imageRef = ref(storage, questions[qIndex].choiceImages[cIndex]);
+        await deleteObject(imageRef);
+        await deleteImageReference(questions[qIndex].choiceImages[cIndex]);
+      } catch (error) {}
+    }
     if (choiceFileRefs.current[qIndex] && choiceFileRefs.current[qIndex][cIndex]) {
       choiceFileRefs.current[qIndex][cIndex].value = "";
     }
@@ -178,6 +229,12 @@ function EditTest() {
     }
     newQuestions[qIndex].choiceImages[cIndex] = "";
     setQuestions(newQuestions);
+    const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+    if (!updatedChoiceImagesFromBank[qIndex]) {
+      updatedChoiceImagesFromBank[qIndex] = [];
+    }
+    updatedChoiceImagesFromBank[qIndex][cIndex] = false;
+    setChoiceImagesFromBank(updatedChoiceImagesFromBank);
   };
 
   const handleAddNewQuestion = () => {
@@ -192,6 +249,8 @@ function EditTest() {
     };
     setQuestions([...questions, newQuestion]);
     setInputModes((prev) => ({ ...prev, [questions.length]: "regular" }));
+    setQuestionImagesFromBank(prev => [...prev, false]);
+    setChoiceImagesFromBank(prev => [...prev, [false, false]]);
     setShowAddQuestionOptions(false);
   };
 
@@ -214,6 +273,8 @@ function EditTest() {
       ...prev,
       [questions.length]: item.inputMode || "latex",
     }));
+    setQuestionImagesFromBank(prev => [...prev, false]);
+    setChoiceImagesFromBank(prev => [...prev, new Array((newQuestion.choices || []).length).fill(false)]);
     setShowAddQuestionOptions(false);
   };
 
@@ -225,6 +286,12 @@ function EditTest() {
     }
     newQuestions[qIndex].choiceImages.push("");
     setQuestions(newQuestions);
+    const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+    if (!updatedChoiceImagesFromBank[qIndex]) {
+      updatedChoiceImagesFromBank[qIndex] = [];
+    }
+    updatedChoiceImagesFromBank[qIndex].push(false);
+    setChoiceImagesFromBank(updatedChoiceImagesFromBank);
   };
 
   const handleDeleteOption = (qIndex, cIndex) => {
@@ -241,12 +308,23 @@ function EditTest() {
       newQuestions[qIndex].correctAnswer = "a";
     }
     setQuestions(newQuestions);
+    const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+    if (updatedChoiceImagesFromBank[qIndex]) {
+      updatedChoiceImagesFromBank[qIndex].splice(cIndex, 1);
+    }
+    setChoiceImagesFromBank(updatedChoiceImagesFromBank);
   };
 
   const handleDeleteQuestion = (qIndex) => {
     const newQuestions = [...questions];
     newQuestions.splice(qIndex, 1);
     setQuestions(newQuestions);
+    const updatedQuestionImagesFromBank = [...questionImagesFromBank];
+    updatedQuestionImagesFromBank.splice(qIndex, 1);
+    setQuestionImagesFromBank(updatedQuestionImagesFromBank);
+    const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+    updatedChoiceImagesFromBank.splice(qIndex, 1);
+    setChoiceImagesFromBank(updatedChoiceImagesFromBank);
   };
 
   const getChoiceStyle = (qIndex, cIndex) => {
@@ -262,14 +340,46 @@ function EditTest() {
     );
   };
 
+  const openImageBank = (type, qIndex, cIndex = null) => {
+    setImageBankType(type);
+    setImageBankQIndex(qIndex);
+    setImageBankChoiceIndex(cIndex);
+    setShowImageBank(true);
+  };
+
+  const handleSelectImageFromBank = (url) => {
+    const newQuestions = [...questions];
+    if (imageBankType === "question") {
+      newQuestions[imageBankQIndex].questionImageUrl = url;
+      setQuestions(newQuestions);
+      const updatedQuestionImagesFromBank = [...questionImagesFromBank];
+      updatedQuestionImagesFromBank[imageBankQIndex] = true;
+      setQuestionImagesFromBank(updatedQuestionImagesFromBank);
+    } else if (imageBankType === "choice" && imageBankChoiceIndex !== null) {
+      if (!newQuestions[imageBankQIndex].choiceImages) {
+        newQuestions[imageBankQIndex].choiceImages = [];
+      }
+      newQuestions[imageBankQIndex].choiceImages[imageBankChoiceIndex] = url;
+      setQuestions(newQuestions);
+      const updatedChoiceImagesFromBank = [...choiceImagesFromBank];
+      if (!updatedChoiceImagesFromBank[imageBankQIndex]) {
+        updatedChoiceImagesFromBank[imageBankQIndex] = [];
+      }
+      updatedChoiceImagesFromBank[imageBankQIndex][imageBankChoiceIndex] = true;
+      setChoiceImagesFromBank(updatedChoiceImagesFromBank);
+    }
+    setShowImageBank(false);
+    setImageBankType("");
+    setImageBankQIndex(null);
+    setImageBankChoiceIndex(null);
+  };
+
   const handleSaveTest = async (e) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      console.error("No user is logged in");
       return;
     }
-
     const finalQuestions = questions.map((q, qIndex) => {
       const mode = inputModes[qIndex];
       if (mode === "regular") {
@@ -290,9 +400,7 @@ function EditTest() {
         };
       }
     });
-
     const newQuestions = finalQuestions.filter((q) => q.isNew);
-
     try {
       for (const q of newQuestions) {
         if (q.text.trim() && q.choices.filter((c) => c.trim()).length >= 2) {
@@ -305,7 +413,6 @@ function EditTest() {
         }
       }
       const cleanedQuestions = finalQuestions.map(({ isNew, ...rest }) => rest);
-
       const testRef = doc(db, "tests", testId);
       await updateDoc(testRef, {
         testName,
@@ -318,9 +425,7 @@ function EditTest() {
         setSuccessMessage(false);
         navigate("/test-viewer");
       }, 2000);
-    } catch (error) {
-      console.error("Error updating test: ", error);
-    }
+    } catch (error) {}
   };
 
   return (
@@ -328,7 +433,6 @@ function EditTest() {
       <header className="jumbotron jumbotron-fluid bg-light text-center">
         <h1>Edit Test</h1>
       </header>
-
       <main className="container">
         <form onSubmit={handleSaveTest}>
           <div className="form-group mb-4" ref={dropdownRef}>
@@ -365,7 +469,6 @@ function EditTest() {
               </div>
             )}
           </div>
-
           <div className="form-group mb-4">
             <label htmlFor="test-name">Test Name</label>
             <input
@@ -375,7 +478,6 @@ function EditTest() {
               onChange={(e) => setTestName(e.target.value)}
             />
           </div>
-
           {questions.map((question, qIndex) => (
             <div key={qIndex} className="form-group mb-4">
               <div className="card">
@@ -387,9 +489,7 @@ function EditTest() {
                   >
                     X
                   </button>
-
                   <h3 className="card-title">{qIndex + 1}.</h3>
-
                   <input
                     className="form-control mb-3"
                     placeholder="Question Title (optional)"
@@ -398,7 +498,6 @@ function EditTest() {
                       handleInputChange(qIndex, "title", e.target.value)
                     }
                   />
-
                   <div className="mb-2">
                     <label className="me-3">Input Mode:</label>
                     <div className="form-check form-check-inline">
@@ -434,24 +533,31 @@ function EditTest() {
                       <label className="form-check-label">LaTeX</label>
                     </div>
                   </div>
-
                   {inputModes[qIndex] === "latex" && (
                     <div className="alert alert-info py-2">
                       <strong>Note:</strong> Enter your question and choices using LaTeX syntax.
                     </div>
                   )}
-
                   <div className="form-group mb-4">
                     <label>Question Image</label>
                     <br />
                     {!question.questionImageUrl ? (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => questionFileRefs.current[qIndex]?.click()}
-                      >
-                        Add Image
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-secondary me-2"
+                          onClick={() => questionFileRefs.current[qIndex]?.click()}
+                        >
+                          Add Image
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-info"
+                          onClick={() => openImageBank("question", qIndex)}
+                        >
+                          Select from Image Bank
+                        </button>
+                      </>
                     ) : (
                       <div className="position-relative d-inline-block">
                         <img
@@ -482,7 +588,6 @@ function EditTest() {
                       }
                     />
                   </div>
-
                   <textarea
                     className="form-control mb-2"
                     rows="4"
@@ -496,7 +601,6 @@ function EditTest() {
                         : "Enter LaTeX"
                     }
                   />
-
                   {inputModes[qIndex] === "latex" && (
                     <div
                       className="mt-2 p-2 border bg-light"
@@ -509,7 +613,6 @@ function EditTest() {
                       <BlockMath>{question.text}</BlockMath>
                     </div>
                   )}
-
                   <ol type="a" className="list-group mt-3">
                     {question.choices.map((choice, cIndex) => (
                       <li
@@ -534,20 +637,28 @@ function EditTest() {
                             handleChoiceChange(qIndex, cIndex, e.target.value)
                           }
                         />
-
                         {!(question.choiceImages && question.choiceImages[cIndex]) ? (
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              if (!choiceFileRefs.current[qIndex]) {
-                                choiceFileRefs.current[qIndex] = [];
-                              }
-                              choiceFileRefs.current[qIndex][cIndex]?.click();
-                            }}
-                          >
-                            Add Image
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-secondary me-2"
+                              onClick={() => {
+                                if (!choiceFileRefs.current[qIndex]) {
+                                  choiceFileRefs.current[qIndex] = [];
+                                }
+                                choiceFileRefs.current[qIndex][cIndex]?.click();
+                              }}
+                            >
+                              Add Image
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-info"
+                              onClick={() => openImageBank("choice", qIndex, cIndex)}
+                            >
+                              Select from Image Bank
+                            </button>
+                          </>
                         ) : (
                           <div className="position-relative d-inline-block">
                             <img
@@ -583,7 +694,6 @@ function EditTest() {
                             )
                           }
                         />
-
                         {inputModes[qIndex] === "latex" && (
                           <div
                             className="mt-2 p-2 border bg-light"
@@ -599,7 +709,6 @@ function EditTest() {
                       </li>
                     ))}
                   </ol>
-
                   <button
                     type="button"
                     className="btn btn-primary btn-sm mt-3"
@@ -607,7 +716,6 @@ function EditTest() {
                   >
                     Add Option
                   </button>
-
                   <h6 className="mt-3">Correct Answer:</h6>
                   <select
                     className="form-select"
@@ -629,7 +737,6 @@ function EditTest() {
               </div>
             </div>
           ))}
-
           {showAddQuestionOptions && (
             <div className="card p-3 mb-4">
               <h5>Add Question</h5>
@@ -639,7 +746,6 @@ function EditTest() {
               >
                 Create New Question
               </button>
-
               <h6>Or choose from Item Bank:</h6>
               <ul
                 className="list-group"
@@ -662,7 +768,6 @@ function EditTest() {
               </ul>
             </div>
           )}
-
           <div className="mb-4">
             <button
               type="button"
@@ -677,7 +782,32 @@ function EditTest() {
           </div>
         </form>
       </main>
-
+      {showImageBank && (
+        <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Select Image from Bank</h5>
+                <button type="button" className="btn-close" onClick={() => setShowImageBank(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="d-flex flex-wrap">
+                  {imageBank.length === 0 && <p>No images available.</p>}
+                  {imageBank.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`Bank ${idx}`}
+                      style={{ maxWidth: "100px", margin: "5px", cursor: "pointer", border: "2px solid #eee" }}
+                      onClick={() => handleSelectImageFromBank(url)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {successMessage && (
         <div className="alert alert-success fixed-bottom m-3 text-center">
           Your test was updated successfully!

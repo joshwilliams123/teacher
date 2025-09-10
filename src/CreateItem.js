@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, addDoc, collection, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { getDocs } from "firebase/firestore";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
@@ -20,6 +21,10 @@ function CreateItem() {
     const [successMessage, setSuccessMessage] = useState(false);
     const [user, setUser] = useState(null);
     const [inputMode, setInputMode] = useState("regular");
+    const [imageBank, setImageBank] = useState([]);
+    const [showImageBank, setShowImageBank] = useState(false);
+    const [imageBankType, setImageBankType] = useState("");
+    const [imageBankChoiceIndex, setImageBankChoiceIndex] = useState(null);
     const auth = getAuth();
     const navigate = useNavigate();
 
@@ -36,6 +41,15 @@ function CreateItem() {
         });
         return () => unsubscribe();
     }, [auth, user]);
+
+    useEffect(() => {
+        async function fetchImages() {
+            const imagesCol = collection(db, "images");
+            const snapshot = await getDocs(imagesCol);
+            setImageBank(snapshot.docs.map(doc => doc.data().url));
+        }
+        fetchImages();
+    }, []);
 
     const handleInputChange = (field, value) => {
         setItem(prevItem => ({ ...prevItem, [field]: value }));
@@ -67,9 +81,7 @@ function CreateItem() {
             try {
                 const imageRef = ref(storage, item.questionImageUrl);
                 await deleteObject(imageRef);
-            } catch (error) {
-                console.error("Error deleting question image from storage:", error);
-            }
+            } catch (error) { }
         }
         if (questionFileRef.current) {
             questionFileRef.current.value = "";
@@ -82,9 +94,7 @@ function CreateItem() {
             try {
                 const imageRef = ref(storage, item.choiceImages[index]);
                 await deleteObject(imageRef);
-            } catch (error) {
-                console.error("Error deleting choice image from storage:", error);
-            }
+            } catch (error) { }
         }
         if (choiceFileRefs.current[index]) {
             choiceFileRefs.current[index].value = "";
@@ -107,6 +117,8 @@ function CreateItem() {
         const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
+        await addDoc(collection(db, "images"), { url });
+
         if (type === "question") {
             setItem(prev => ({ ...prev, questionImageUrl: url }));
         } else if (type === "choice" && index !== null) {
@@ -141,9 +153,7 @@ function CreateItem() {
             });
             setSuccessMessage(true);
             navigate("/view-items");
-        } catch (error) {
-            console.error("Error adding document: ", error);
-        }
+        } catch (error) { }
     };
 
     const getChoiceStyle = (index) => {
@@ -159,6 +169,25 @@ function CreateItem() {
         return tokens
             .map(token => /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)
             .join(" \\ ");
+    };
+
+    const openImageBank = (type, index = null) => {
+        setImageBankType(type);
+        setImageBankChoiceIndex(index);
+        setShowImageBank(true);
+    };
+
+    const handleSelectImageFromBank = (url) => {
+        if (imageBankType === "question") {
+            setItem(prev => ({ ...prev, questionImageUrl: url }));
+        } else if (imageBankType === "choice" && imageBankChoiceIndex !== null) {
+            const newImages = [...item.choiceImages];
+            newImages[imageBankChoiceIndex] = url;
+            setItem(prev => ({ ...prev, choiceImages: newImages }));
+        }
+        setShowImageBank(false);
+        setImageBankType("");
+        setImageBankChoiceIndex(null);
     };
 
     return (
@@ -220,13 +249,22 @@ function CreateItem() {
                         <label>Question Image</label>
                         <br />
                         {!item.questionImageUrl ? (
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => questionFileRef.current.click()}
-                            >
-                                Add Image
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary me-2"
+                                    onClick={() => questionFileRef.current.click()}
+                                >
+                                    Add Image
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-info"
+                                    onClick={() => openImageBank("question")}
+                                >
+                                    Select from Image Bank
+                                </button>
+                            </>
                         ) : (
                             <div className="position-relative d-inline-block">
                                 <img src={item.questionImageUrl} alt="Question Preview" style={{ maxWidth: "200px", marginTop: "10px" }} />
@@ -280,13 +318,22 @@ function CreateItem() {
                                     onChange={(e) => handleChoiceChange(index, e.target.value)}
                                 />
                                 {!item.choiceImages[index] ? (
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => choiceFileRefs.current[index].click()}
-                                    >
-                                        Add Image
-                                    </button>
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary me-2"
+                                            onClick={() => choiceFileRefs.current[index].click()}
+                                        >
+                                            Add Image
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-info"
+                                            onClick={() => openImageBank("choice", index)}
+                                        >
+                                            Select from Image Bank
+                                        </button>
+                                    </>
                                 ) : (
                                     <div className="position-relative d-inline-block">
                                         <img src={item.choiceImages[index]} alt={`Choice ${index + 1}`} style={{ maxWidth: "150px", marginTop: "10px" }} />
@@ -340,6 +387,32 @@ function CreateItem() {
                 {successMessage && (
                     <div className="alert alert-success text-center">
                         <p>Your item was saved successfully!</p>
+                    </div>
+                )}
+                {showImageBank && (
+                    <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,0.5)" }}>
+                        <div className="modal-dialog">
+                            <div className="modal-content">
+                                <div className="modal-header">
+                                    <h5 className="modal-title">Select Image from Bank</h5>
+                                    <button type="button" className="btn-close" onClick={() => setShowImageBank(false)}></button>
+                                </div>
+                                <div className="modal-body">
+                                    <div className="d-flex flex-wrap">
+                                        {imageBank.length === 0 && <p>No images available.</p>}
+                                        {imageBank.map((url, idx) => (
+                                            <img
+                                                key={idx}
+                                                src={url}
+                                                alt={`Bank ${idx}`}
+                                                style={{ maxWidth: "100px", margin: "5px", cursor: "pointer", border: "2px solid #eee" }}
+                                                onClick={() => handleSelectImageFromBank(url)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>
