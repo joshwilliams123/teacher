@@ -11,13 +11,12 @@ import {
   getDocs,
   query,
   where,
-  deleteDoc,
 } from "firebase/firestore";
 import { db, storage } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
 
 function EditTest() {
   const { testId } = useParams();
@@ -37,6 +36,7 @@ function EditTest() {
   const [imageBankChoiceIndex, setImageBankChoiceIndex] = useState(null);
   const [questionImagesFromBank, setQuestionImagesFromBank] = useState([]);
   const [choiceImagesFromBank, setChoiceImagesFromBank] = useState([]);
+  const [user, setUser] = useState(null);
   const dropdownRef = useRef(null);
 
   const auth = getAuth();
@@ -46,6 +46,10 @@ function EditTest() {
   const choiceFileRefs = useRef([]);
 
   useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+
     const fetchTest = async () => {
       try {
         const testRef = doc(db, "tests", testId);
@@ -83,12 +87,11 @@ function EditTest() {
     };
 
     const fetchItems = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!user) return;
       try {
         const q = query(
           collection(db, "items"),
-          where("userId", "==", currentUser.uid)
+          where("userId", "==", user.uid)
         );
         const snapshot = await getDocs(q);
         const itemList = snapshot.docs.map((doc) => ({
@@ -100,12 +103,11 @@ function EditTest() {
     };
 
     const fetchClasses = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!user) return;
       try {
         const q = query(
           collection(db, "classes"),
-          where("userId", "==", currentUser.uid)
+          where("userId", "==", user.uid)
         );
         const snapshot = await getDocs(q);
         const classList = snapshot.docs.map((doc) => ({
@@ -117,25 +119,22 @@ function EditTest() {
     };
 
     const fetchImages = async () => {
-      const imagesCol = collection(db, "images");
-      const snapshot = await getDocs(imagesCol);
-      setImageBank(snapshot.docs.map(doc => doc.data().url));
+      if (!user) return;
+      const folderRef = ref(storage, `itemImages/${user.uid}/`);
+      const result = await listAll(folderRef);
+      const urls = await Promise.all(
+        result.items.map(async (itemRef) => await getDownloadURL(itemRef))
+      );
+      setImageBank(urls);
     };
 
     fetchTest();
     fetchItems();
     fetchClasses();
     fetchImages();
-  }, [testId]);
 
-  const deleteImageReference = async (url) => {
-    const imagesCol = collection(db, "images");
-    const q = query(imagesCol, where("url", "==", url));
-    const snapshot = await getDocs(q);
-    snapshot.forEach(async (docSnap) => {
-      await deleteDoc(docSnap.ref);
-    });
-  };
+    return () => unsubscribe();
+  }, [testId, user]);
 
   const convertTextToLatex = (text) => {
     if (!text.trim()) return text;
@@ -159,8 +158,8 @@ function EditTest() {
   };
 
   const handleImageUpload = async (file, type, qIndex, cIndex = null) => {
-    if (!file) return;
-    const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+    if (!file || !user) return;
+    const storageRef = ref(storage, `itemImages/${user.uid}/${Date.now()}-${file.name}`);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
     const newQuestions = [...questions];
@@ -183,17 +182,9 @@ function EditTest() {
       updatedChoiceImagesFromBank[qIndex][cIndex] = false;
       setChoiceImagesFromBank(updatedChoiceImagesFromBank);
     }
-    await addDoc(collection(db, "images"), { url });
   };
 
   const handleDeleteQuestionImage = async (qIndex) => {
-    if (questions[qIndex].questionImageUrl && !questionImagesFromBank[qIndex]) {
-      try {
-        const imageRef = ref(storage, questions[qIndex].questionImageUrl);
-        await deleteObject(imageRef);
-        await deleteImageReference(questions[qIndex].questionImageUrl);
-      } catch (error) {}
-    }
     if (questionFileRefs.current[qIndex]) {
       questionFileRefs.current[qIndex].value = "";
     }
@@ -206,20 +197,6 @@ function EditTest() {
   };
 
   const handleDeleteChoiceImage = async (qIndex, cIndex) => {
-    if (
-      questions[qIndex].choiceImages &&
-      questions[qIndex].choiceImages[cIndex] &&
-      !(
-        choiceImagesFromBank[qIndex] &&
-        choiceImagesFromBank[qIndex][cIndex]
-      )
-    ) {
-      try {
-        const imageRef = ref(storage, questions[qIndex].choiceImages[cIndex]);
-        await deleteObject(imageRef);
-        await deleteImageReference(questions[qIndex].choiceImages[cIndex]);
-      } catch (error) {}
-    }
     if (choiceFileRefs.current[qIndex] && choiceFileRefs.current[qIndex][cIndex]) {
       choiceFileRefs.current[qIndex][cIndex].value = "";
     }
@@ -376,10 +353,7 @@ function EditTest() {
 
   const handleSaveTest = async (e) => {
     e.preventDefault();
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return;
-    }
+    if (!user) return;
     const finalQuestions = questions.map((q, qIndex) => {
       const mode = inputModes[qIndex];
       if (mode === "regular") {
@@ -407,7 +381,7 @@ function EditTest() {
           const { isNew, ...itemData } = q;
           await addDoc(collection(db, "items"), {
             ...itemData,
-            userId: currentUser.uid,
+            userId: user.uid,
             createdAt: new Date(),
           });
         }
@@ -418,7 +392,7 @@ function EditTest() {
         testName,
         classNames: className,
         questions: cleanedQuestions,
-        userId: currentUser.uid,
+        userId: user.uid,
       });
       setSuccessMessage(true);
       setTimeout(() => {

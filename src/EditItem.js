@@ -3,12 +3,11 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
 import "katex/dist/katex.min.css";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, storage } from "./firebase";
 import { useParams, useNavigate } from "react-router-dom";
-import { getAuth } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { addDoc } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
 
 function EditItem() {
     const { itemId } = useParams();
@@ -31,10 +30,18 @@ function EditItem() {
     const [imageBankChoiceIndex, setImageBankChoiceIndex] = useState(null);
     const [questionImageFromBank, setQuestionImageFromBank] = useState(false);
     const [choiceImagesFromBank, setChoiceImagesFromBank] = useState([]);
+    const [user, setUser] = useState(null);
     const auth = getAuth();
 
     const questionFileRef = useRef(null);
     const choiceFileRefs = useRef([]);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, [auth]);
 
     useEffect(() => {
         const fetchItem = async () => {
@@ -62,21 +69,16 @@ function EditItem() {
 
     useEffect(() => {
         async function fetchImages() {
-            const imagesCol = collection(db, "images");
-            const snapshot = await getDocs(imagesCol);
-            setImageBank(snapshot.docs.map(doc => doc.data().url));
+            if (!user) return;
+            const folderRef = ref(storage, `itemImages/${user.uid}/`);
+            const result = await listAll(folderRef);
+            const urls = await Promise.all(
+                result.items.map(async (itemRef) => await getDownloadURL(itemRef))
+            );
+            setImageBank(urls);
         }
         fetchImages();
-    }, []);
-
-    const deleteImageReference = async (url) => {
-        const imagesCol = collection(db, "images");
-        const q = query(imagesCol, where("url", "==", url));
-        const snapshot = await getDocs(q);
-        snapshot.forEach(async (docSnap) => {
-            await deleteDoc(docSnap.ref);
-        });
-    };
+    }, [user]);
 
     const handleInputChange = (field, value) => {
         setItem((prevItem) => ({ ...prevItem, [field]: value }));
@@ -121,13 +123,6 @@ function EditItem() {
     };
 
     const handleDeleteQuestionImage = async () => {
-        if (item.questionImageUrl && !questionImageFromBank) {
-            try {
-                const imageRef = ref(storage, item.questionImageUrl);
-                await deleteObject(imageRef);
-                await deleteImageReference(item.questionImageUrl);
-            } catch (error) {}
-        }
         if (questionFileRef.current) {
             questionFileRef.current.value = "";
         }
@@ -137,13 +132,6 @@ function EditItem() {
     };
 
     const handleDeleteChoiceImage = async (index) => {
-        if (item.choiceImages[index] && !choiceImagesFromBank[index]) {
-            try {
-                const imageRef = ref(storage, item.choiceImages[index]);
-                await deleteObject(imageRef);
-                await deleteImageReference(item.choiceImages[index]);
-            } catch (error) {}
-        }
         if (choiceFileRefs.current[index]) {
             choiceFileRefs.current[index].value = "";
         }
@@ -182,11 +170,10 @@ function EditItem() {
     };
 
     const handleImageUpload = async (file, type, index = null) => {
-        if (!file) return;
-        const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+        if (!file || !user) return;
+        const storageRef = ref(storage, `itemImages/${user.uid}/${Date.now()}-${file.name}`);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
-        await addDoc(collection(db, "images"), { url });
         if (type === "question") {
             setItem(prev => ({ ...prev, questionImageUrl: url }));
             setNewQuestionImage(null);
@@ -233,8 +220,7 @@ function EditItem() {
 
     const handleSaveItem = async (e) => {
         e.preventDefault();
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
+        if (!user) return;
         let finalItem = { ...item };
 
         if (inputMode === "regular") {
@@ -248,21 +234,19 @@ function EditItem() {
         }
 
         if (newQuestionImage) {
-            const imageRef = ref(storage, `itemImages/${Date.now()}-${newQuestionImage.name}`);
+            const imageRef = ref(storage, `itemImages/${user.uid}/${Date.now()}-${newQuestionImage.name}`);
             await uploadBytes(imageRef, newQuestionImage);
             const downloadURL = await getDownloadURL(imageRef);
             finalItem.questionImageUrl = downloadURL;
-            await addDoc(collection(db, "images"), { url: downloadURL });
         }
 
         const updatedChoiceImages = [...finalItem.choiceImages];
         for (let i = 0; i < newChoiceImages.length; i++) {
             if (newChoiceImages[i]) {
-                const imageRef = ref(storage, `itemImages/${Date.now()}-${newChoiceImages[i].name}`);
+                const imageRef = ref(storage, `itemImages/${user.uid}/${Date.now()}-${newChoiceImages[i].name}`);
                 await uploadBytes(imageRef, newChoiceImages[i]);
                 const downloadURL = await getDownloadURL(imageRef);
                 updatedChoiceImages[i] = downloadURL;
-                await addDoc(collection(db, "images"), { url: downloadURL });
             }
         }
         finalItem.choiceImages = updatedChoiceImages;
@@ -271,7 +255,7 @@ function EditItem() {
             const itemRef = doc(db, "items", itemId);
             await updateDoc(itemRef, {
                 ...finalItem,
-                userId: currentUser.uid,
+                userId: user.uid,
                 inputMode: inputMode
             });
             setSuccessMessage(true);

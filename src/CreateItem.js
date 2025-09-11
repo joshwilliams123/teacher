@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, addDoc, collection, storage } from "./firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { getDocs } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from "firebase/storage";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";
 import { BlockMath, InlineMath } from "react-katex";
@@ -44,12 +43,16 @@ function CreateItem() {
 
     useEffect(() => {
         async function fetchImages() {
-            const imagesCol = collection(db, "images");
-            const snapshot = await getDocs(imagesCol);
-            setImageBank(snapshot.docs.map(doc => doc.data().url));
+            if (!user) return;
+            const folderRef = ref(storage, `itemImages/${user.uid}/`);
+            const result = await listAll(folderRef);
+            const urls = await Promise.all(
+                result.items.map(async (itemRef) => await getDownloadURL(itemRef))
+            );
+            setImageBank(urls);
         }
         fetchImages();
-    }, []);
+    }, [user]);
 
     const handleInputChange = (field, value) => {
         setItem(prevItem => ({ ...prevItem, [field]: value }));
@@ -113,12 +116,10 @@ function CreateItem() {
     };
 
     const handleImageUpload = async (file, type, index = null) => {
-        if (!file) return;
-        const storageRef = ref(storage, `itemImages/${Date.now()}-${file.name}`);
+        if (!file || !user) return;
+        const storageRef = ref(storage, `itemImages/${user.uid}/${Date.now()}-${file.name}`);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
-        await addDoc(collection(db, "images"), { url });
-
         if (type === "question") {
             setItem(prev => ({ ...prev, questionImageUrl: url }));
         } else if (type === "choice" && index !== null) {
