@@ -357,59 +357,59 @@ function MonitorProgress() {
                 <button type="button" className="btn-close" onClick={handleCloseModal}></button>
               </div>
               <div className="modal-body" ref={modalBodyRef}>
-  <h5 style={{ fontFamily: "Georgia, serif", fontWeight: "bold", color: "black", marginBottom: "20px" }}>
-    Student: {selectedStudent.userEmail || selectedStudent.userId}
-  </h5>
-  <h5 style={{ fontFamily: "Georgia, serif", color: "black", marginBottom: "20px" }}>
-    Test: {selectedStudent.testTitle || selectedStudent.testId}
-  </h5>
-  {selectedStudent.answerDetails && selectedStudent.answerDetails.length > 0 ? (
-    <div className="table-responsive">
-      <table className="table table-bordered">
-        <thead>
-          <tr>
-            <th>Question</th>
-            <th>Time Spent (s)</th>
-            <th>Student's Choice</th>
-            <th>Correct Answer</th>
-            <th>Correct?</th>
-          </tr>
-        </thead>
-        <tbody>
-          {selectedStudent.answerDetails.map((detail, idx) => (
-            <tr key={idx}>
-              <td>{detail.questionIndex + 1}</td>
-              <td>
-                {selectedStudent.questionTimes && selectedStudent.questionTimes[detail.questionIndex] !== undefined
-                  ? (selectedStudent.questionTimes[detail.questionIndex] / 1000).toFixed(2)
-                  : "N/A"}
-              </td>
-              <td>
-                {detail.selectedText
-                  ? <InlineMath math={detail.selectedText} />
-                  : "N/A"}
-              </td>
-              <td>
-                {detail.correctText
-                  ? <InlineMath math={detail.correctText} />
-                  : "N/A"}
-              </td>
-              <td>
-                {detail.selectedIndex === detail.correctIndex ? (
-                  <span className="text-success">✔</span>
+                <h5 style={{ fontFamily: "Georgia, serif", fontWeight: "bold", color: "black", marginBottom: "20px" }}>
+                  Student: {selectedStudent.userEmail || selectedStudent.userId}
+                </h5>
+                <h5 style={{ fontFamily: "Georgia, serif", color: "black", marginBottom: "20px" }}>
+                  Test: {selectedStudent.testTitle || selectedStudent.testId}
+                </h5>
+                {selectedStudent.answerDetails && selectedStudent.answerDetails.length > 0 ? (
+                  <div className="table-responsive">
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Question</th>
+                          <th>Time Spent (s)</th>
+                          <th>Student's Choice</th>
+                          <th>Correct Answer</th>
+                          <th>Correct?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedStudent.answerDetails.map((detail, idx) => (
+                          <tr key={idx}>
+                            <td>{detail.questionIndex + 1}</td>
+                            <td>
+                              {selectedStudent.questionTimes && selectedStudent.questionTimes[detail.questionIndex] !== undefined
+                                ? (selectedStudent.questionTimes[detail.questionIndex] / 1000).toFixed(2)
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.selectedText
+                                ? <InlineMath math={detail.selectedText} />
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.correctText
+                                ? <InlineMath math={detail.correctText} />
+                                : "N/A"}
+                            </td>
+                            <td>
+                              {detail.selectedIndex === detail.correctIndex ? (
+                                <span className="text-success">✔</span>
+                              ) : (
+                                <span className="text-danger">✘</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <span className="text-danger">✘</span>
+                  <p>No question analytics data available.</p>
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <p>No question analytics data available.</p>
-  )}
-</div>
+              </div>
               <div className="modal-footer">
                 <button className="btn btn-primary" onClick={handleDownloadPDF}>
                   Download as PDF
