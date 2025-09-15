@@ -149,8 +149,15 @@ function EditItem() {
     const convertTextToLatex = (text) => {
         if (!text.trim()) return text;
         if (text.includes("\\text{")) return text;
-        const tokens = text.split(/\s+/);
-        return tokens.map(token => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)).join(" \\ ");
+        return text
+            .split(/\n+/)
+            .map(line => {
+                const tokens = line.split(/\s+/);
+                return tokens
+                    .map(token => /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)
+                    .join(" \\ ");
+            })
+            .join(" \\\\ ");
     };
 
     const handleQuestionImageChange = (e) => {
@@ -390,7 +397,7 @@ function EditItem() {
                                         &times;
                                     </button>
                                 )}
-                                <input
+                                <textarea rows="2"
                                     className="form-control mb-2"
                                     placeholder={`Answer Choice ${index + 1}`}
                                     value={choice}

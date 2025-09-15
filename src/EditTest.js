@@ -137,13 +137,18 @@ function EditTest() {
   }, [testId, user]);
 
   const convertTextToLatex = (text) => {
-    if (!text.trim()) return text;
-    if (text.includes("\\text{")) return text;
-    const tokens = text.split(/\s+/);
-    return tokens
-      .map((token) => (/[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`))
-      .join(" \\ ");
-  };
+        if (!text.trim()) return text;
+        if (text.includes("\\text{")) return text;
+        return text
+            .split(/\n+/)
+            .map(line => {
+                const tokens = line.split(/\s+/);
+                return tokens
+                    .map(token => /[0-9+\-*/=]/.test(token) ? token : `\\text{${token}}`)
+                    .join(" \\ ");
+            })
+            .join(" \\\\ ");
+    };
 
   const handleInputChange = (qIndex, field, value) => {
     const newQuestions = [...questions];
@@ -603,7 +608,7 @@ function EditTest() {
                             X
                           </button>
                         )}
-                        <input
+                        <textarea rows="2"
                           className="form-control mb-2"
                           placeholder={`Answer Choice ${cIndex + 1}`}
                           value={choice}
