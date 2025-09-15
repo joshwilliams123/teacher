@@ -7,7 +7,6 @@ import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -19,6 +18,9 @@ import {
   Legend,
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
+import { FaUsers } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, annotationPlugin);
 
@@ -31,8 +33,11 @@ function MonitorProgress() {
   const [showModal, setShowModal] = useState(false);
   const [showChartModal, setShowChartModal] = useState(false);
   const [chartStudent, setChartStudent] = useState(null);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupTestId, setGroupTestId] = useState(null);
   const modalBodyRef = useRef(null);
   const chartRef = useRef(null);
+  const groupModalBodyRef = useRef(null);
 
   useEffect(() => {
     const auth = getAuth();
@@ -90,6 +95,15 @@ function MonitorProgress() {
     setChartStudent(null);
   };
 
+  const handleShowGroupModal = (testId) => {
+    setGroupTestId(testId);
+    setShowGroupModal(true);
+  };
+  const handleCloseGroupModal = () => {
+    setShowGroupModal(false);
+    setGroupTestId(null);
+  };
+
   const getClassNameById = (id) => {
     const classObj = classes.find(cls => cls.id === id);
     return classObj ? (classObj.name || classObj.className || "Unnamed Class") : "Unknown Class";
@@ -120,6 +134,61 @@ function MonitorProgress() {
     pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save("student-performance-chart.pdf");
   };
+
+  const handleDownloadGroupPDF = async () => {
+    if (!groupModalBodyRef.current) return;
+    const canvas = await html2canvas(groupModalBodyRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: [canvas.width, canvas.height]
+    });
+    pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+    pdf.save("group-test-analytics.pdf");
+  };
+
+  const handleDownloadExcel = () => {
+    if (!selectedStudent || !selectedStudent.answerDetails) return;
+    const rows = selectedStudent.answerDetails.map((detail, idx) => ({
+      Question: detail.questionIndex + 1,
+      "Time Spent (s)": selectedStudent.questionTimes?.[detail.questionIndex]
+        ? (selectedStudent.questionTimes[detail.questionIndex] / 1000).toFixed(2)
+        : "N/A",
+      "Student's Choice": detail.selectedText || "N/A",
+      "Correct Answer": detail.correctText || "N/A",
+      Correct: detail.selectedIndex === detail.correctIndex ? "✔" : "✘"
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Analytics");
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([excelBuffer], { type: "application/octet-stream" }), "test-analytics.xlsx");
+  };
+
+  const handleDownloadGroupExcel = () => {
+    if (!groupStudents || groupStudents.length === 0) return;
+    const rows = groupStudents.map((student) => ({
+      Student: student.userEmail || student.userId,
+      Score: typeof student.score === "number"
+        ? `${student.score} / ${student.questionTimes?.length ?? "?"}`
+        : "N/A"
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Group Analytics");
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([excelBuffer], { type: "application/octet-stream" }), "group-test-analytics.xlsx");
+  };
+
+  let classAveragePercent = null;
+  let totalQuestions = null;
+  if (students.length > 0) {
+    const validScores = students.filter(s => typeof s.score === "number" && Array.isArray(s.questionTimes) && s.questionTimes.length > 0);
+    const totalScore = validScores.reduce((sum, s) => sum + s.score, 0);
+    totalQuestions = validScores.reduce((sum, s) => sum + s.questionTimes.length, 0);
+    classAveragePercent = totalQuestions > 0 ? ((totalScore / totalQuestions) * 100).toFixed(2) : null;
+  }
 
   let chartData = null;
   let chartOptions = {};
@@ -258,6 +327,38 @@ function MonitorProgress() {
     };
   }
 
+  const groupStudents = groupTestId
+    ? students.filter(s => s.testId === groupTestId)
+    : [];
+
+  let groupAverageScore = null;
+  let groupTotalQuestions = null;
+  let groupAveragePercent = null;
+  let groupMostMissedQuestion = null;
+  let groupTestName = groupStudents[0]?.testTitle || groupTestId;
+
+  if (groupStudents.length > 0) {
+    const validScores = groupStudents.filter(s => typeof s.score === "number" && Array.isArray(s.questionTimes) && s.questionTimes.length > 0);
+    const totalScore = validScores.reduce((sum, s) => sum + s.score, 0);
+    groupTotalQuestions = validScores.reduce((sum, s) => sum + s.questionTimes.length, 0);
+    groupAverageScore = validScores.length > 0 ? (totalScore / validScores.length).toFixed(2) : null;
+    groupAveragePercent = groupTotalQuestions > 0 ? ((totalScore / groupTotalQuestions) * 100).toFixed(2) : null;
+
+    const missCounts = {};
+    validScores.forEach(student => {
+      student.answerDetails?.forEach(detail => {
+        if (detail.selectedIndex !== detail.correctIndex) {
+          missCounts[detail.questionIndex] = (missCounts[detail.questionIndex] || 0) + 1;
+        }
+      });
+    });
+    const maxMissed = Math.max(...Object.values(missCounts), 0);
+    const mostMissedIdx = Object.keys(missCounts).find(idx => missCounts[idx] === maxMissed);
+    if (mostMissedIdx !== undefined) {
+      groupMostMissedQuestion = `Question ${parseInt(mostMissedIdx) + 1}`;
+    }
+  }
+
   return (
     <div>
       <header>
@@ -284,6 +385,12 @@ function MonitorProgress() {
             ))}
           </select>
         </div>
+
+        {students.length > 0 && (
+          <div className="alert alert-info text-center mt-3">
+            <strong>Class Average Score:</strong> {classAveragePercent ? `${classAveragePercent}%` : "N/A"}
+          </div>
+        )}
 
         <div className="table-responsive mt-4">
           <table className="table table-striped">
@@ -320,10 +427,17 @@ function MonitorProgress() {
                         Test Analytics
                       </button>
                       <button
-                        className="btn btn-sm btn-success"
+                        className="btn btn-sm btn-success me-2"
                         onClick={() => handleShowChartModal(student)}
                       >
                         Student's Overall Performance
+                      </button>
+                      <button
+                        className="btn btn-sm btn-warning"
+                        title="View all students for this test"
+                        onClick={() => handleShowGroupModal(student.testId)}
+                      >
+                        <FaUsers /> Class Test Analytics
                       </button>
                     </td>
                   </tr>
@@ -341,7 +455,7 @@ function MonitorProgress() {
           role="dialog"
           style={{
             background: "rgba(0,0,0,0.5)",
-            zIndex: 1050
+            zIndex: showGroupModal ? 1060 : 1050
           }}
         >
           <div
@@ -414,6 +528,9 @@ function MonitorProgress() {
                 <button className="btn btn-primary" onClick={handleDownloadPDF}>
                   Download as PDF
                 </button>
+                <button className="btn btn-success" onClick={handleDownloadExcel}>
+                  Download as Excel
+                </button>
                 <button className="btn btn-secondary" onClick={handleCloseModal}>Close</button>
               </div>
             </div>
@@ -457,6 +574,85 @@ function MonitorProgress() {
                   Download Chart as PDF
                 </button>
                 <button className="btn btn-secondary" onClick={handleCloseChartModal}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGroupModal && (
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1052
+          }}
+        >
+          <div
+            className="modal-dialog modal-xl"
+            role="document"
+            style={{ maxWidth: "90vw" }}
+          >
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  Group Test Analytics for {groupTestName}
+                </h5>
+                <button type="button" className="btn-close" onClick={handleCloseGroupModal}></button>
+              </div>
+              <div className="modal-body" ref={groupModalBodyRef}>
+                <div className="mb-3">
+                  <h5 style={{ fontFamily: "Georgia, serif", fontWeight: "bold", color: "#000", marginBottom: "10px" }}>
+                    {groupTestName}
+                  </h5>
+                  <strong>Average Score:</strong> {groupAverageScore ?? "N/A"} out of {groupAverageScore && groupTotalQuestions ? (groupTotalQuestions / groupStudents.length).toFixed(2) : "N/A"}<br />
+                  <strong>Average Percentage:</strong> {groupAveragePercent ? `${groupAveragePercent}%` : "N/A"}<br />
+                  {groupMostMissedQuestion && (
+                    <span><strong>Most Commonly Missed Question:</strong> {groupMostMissedQuestion}</span>
+                  )}
+                </div>
+                <div className="table-responsive">
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Score</th>
+                        <th>Test Analytics</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupStudents.map((student, idx) => (
+                        <tr key={student.id}>
+                          <td>{student.userEmail || student.userId}</td>
+                          <td>
+                            {typeof student.score === "number"
+                              ? `${student.score} / ${student.questionTimes?.length ?? "?"}`
+                              : "N/A"}
+                          </td>
+                          <td>
+                            <button
+                              className="btn btn-sm btn-info"
+                              onClick={() => handleShowModal(student)}
+                            >
+                              View Test Analytics
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-primary" onClick={handleDownloadGroupPDF}>
+                  Download Group Analytics as PDF
+                </button>
+                <button className="btn btn-success" onClick={handleDownloadGroupExcel}>
+                  Download Group Analytics as Excel
+                </button>
+                <button className="btn btn-secondary" onClick={handleCloseGroupModal}>Close</button>
               </div>
             </div>
           </div>
