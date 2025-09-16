@@ -1,3 +1,5 @@
+// Allows teachers to create new test items with text, images, and LaTeX formatting
+
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";

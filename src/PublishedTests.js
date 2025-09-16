@@ -1,3 +1,5 @@
+// Teachers can view all tests they have published to their classes here.
+
 import React, { useEffect, useState } from "react";
 import { getAuth } from "firebase/auth";
 import { db, collection, getDocs, query, where } from "./firebase";

@@ -1,3 +1,5 @@
+// Teachers can log in here using email/password or Google authentication. They can also reset their password if needed.
+
 import React, { useState } from "react";
 import {
   signInWithEmailAndPassword,

@@ -1,3 +1,6 @@
+// Teachers can edit existing tests here, changes regarding images, text, and classes are saved.
+// New questions added to the test are also saved to the item bank.
+
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";

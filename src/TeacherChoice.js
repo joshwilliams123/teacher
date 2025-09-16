@@ -1,3 +1,5 @@
+// Teachers can choose to view existing tests or create a new test
+
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css";

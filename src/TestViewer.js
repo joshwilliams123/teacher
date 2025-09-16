@@ -1,3 +1,5 @@
+// Teachers can view, edit, delete, publish, and preview tests they have created.
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";

@@ -1,3 +1,5 @@
+// Initial authentication route for users to sign up or log in
+
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./css/styles.css"; 

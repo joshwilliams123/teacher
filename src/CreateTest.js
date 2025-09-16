@@ -1,3 +1,5 @@
+// Provides teachers the ability to create tests by selecting from existing items and assigning them to classes
+
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";

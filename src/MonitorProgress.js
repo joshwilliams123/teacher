@@ -1,3 +1,5 @@
+// Teachers can monitor student test progress here, view individual and group analytics, and download reports as PDF or Excel files.
+
 import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, collection, getDocs, query, where } from "./firebase";

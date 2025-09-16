@@ -1,3 +1,5 @@
+// Teachers can sign up here using email/password or Google authentication.
+
 import React, { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, googleProvider, signInWithPopup } from "./firebase";

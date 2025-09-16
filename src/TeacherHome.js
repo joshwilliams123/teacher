@@ -1,3 +1,5 @@
+// Teachers can navigate to create/edit tests or monitor student progress
+
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { Link } from "react-router-dom";

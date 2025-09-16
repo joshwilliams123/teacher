@@ -1,3 +1,5 @@
+// Sidebar for teachers, allowing for navigation to all other features.
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";

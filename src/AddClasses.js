@@ -1,3 +1,5 @@
+// Provides teachers the ability to add classes, which they can later assign and publish tests to
+
 import React, { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, collection, addDoc, getDocs, query, where } from "./firebase";
