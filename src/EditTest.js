@@ -788,7 +788,7 @@ function EditTest() {
         </div>
       )}
       {successMessage && (
-        <div className="alert alert-success fixed-bottom m-3 text-center">
+        <div className="alert alert-success text-center">
           Your test was updated successfully!
         </div>
       )}
