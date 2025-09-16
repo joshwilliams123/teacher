@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db, collection, getDocs, query, where } from "./firebase";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "./css/styles.css";
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
@@ -170,18 +171,52 @@ function MonitorProgress() {
 
   const handleDownloadGroupExcel = () => {
     if (!groupStudents || groupStudents.length === 0) return;
-    const rows = groupStudents.map((student) => ({
-      Student: student.userEmail || student.userId,
-      Score: typeof student.score === "number"
-        ? `${student.score} / ${student.questionTimes?.length ?? "?"}`
-        : "N/A"
-    }));
+
+    const rows = [];
+    groupStudents.forEach((student) => {
+      const totalQuestions = student.questionTimes?.length || 0;
+      const scoreDisplay =
+        typeof student.score === "number"
+          ? `${student.score} / ${totalQuestions}`
+          : "N/A";
+
+      if (student.answerDetails && student.answerDetails.length > 0) {
+        student.answerDetails.forEach((detail) => {
+          rows.push({
+            Student: student.userEmail || student.userId,
+            Score: scoreDisplay,
+            Question: detail.questionIndex + 1,
+            "Time Spent (s)": student.questionTimes?.[detail.questionIndex]
+              ? (student.questionTimes[detail.questionIndex] / 1000).toFixed(2)
+              : "N/A",
+            "Student's Choice": detail.selectedText || "N/A",
+            "Correct Answer": detail.correctText || "N/A",
+            Correct: detail.selectedIndex === detail.correctIndex ? "✔" : "✘",
+          });
+        });
+      } else {
+        rows.push({
+          Student: student.userEmail || student.userId,
+          Score: scoreDisplay,
+          Question: "N/A",
+          "Time Spent (s)": "N/A",
+          "Student's Choice": "N/A",
+          "Correct Answer": "N/A",
+          Correct: "N/A",
+        });
+      }
+    });
+
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Group Analytics");
     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([excelBuffer], { type: "application/octet-stream" }), "group-test-analytics.xlsx");
+    saveAs(
+      new Blob([excelBuffer], { type: "application/octet-stream" }),
+      "group-test-analytics.xlsx"
+    );
   };
+
 
   let classAveragePercent = null;
   let totalQuestions = null;
@@ -394,6 +429,35 @@ function MonitorProgress() {
           </div>
         )}
 
+        {students.length > 0 && (
+          <div className="text-center mt-3">
+            <div className="dropdown d-inline-block">
+              <button
+                className="btn btn-warning dropdown-toggle"
+                type="button"
+                id="classTestAnalyticsDropdown"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <FaUsers /> Class Test Analytics
+              </button>
+              <ul className="dropdown-menu" aria-labelledby="classTestAnalyticsDropdown">
+                {[...new Map(students.map(s => [s.testId, s])).values()].map(test => (
+                  <li key={test.testId}>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => handleShowGroupModal(test.testId)}
+                    >
+                      {test.testTitle || test.testId}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+
         <div className="table-responsive mt-4">
           <table className="table table-striped">
             <thead>
@@ -433,13 +497,6 @@ function MonitorProgress() {
                         onClick={() => handleShowChartModal(student)}
                       >
                         Student's Overall Performance
-                      </button>
-                      <button
-                        className="btn btn-sm btn-warning"
-                        title="View all students for this test"
-                        onClick={() => handleShowGroupModal(student.testId)}
-                      >
-                        <FaUsers /> Class Test Analytics
                       </button>
                     </td>
                   </tr>
